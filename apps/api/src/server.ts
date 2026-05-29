@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import { env } from './config/env.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { registerMatchRoutes } from './routes/match.js';
 import { attachRealtime } from './realtime/socket.js';
 
 export async function buildServer() {
@@ -21,6 +22,7 @@ export async function buildServer() {
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
 
   await registerAuthRoutes(app);
+  await registerMatchRoutes(app);
 
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();

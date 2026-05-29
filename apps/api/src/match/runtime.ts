@@ -12,6 +12,7 @@ import {
   type Color,
 } from '@omnira/chess-engine';
 import { prisma } from '@omnira/db';
+import { enqueueRegister, enqueueMove, enqueueFinalize } from '../onchain/queue.js';
 import { createMatch, recordMove, endMatch, updateRating } from './service.js';
 import { applyElo } from '../rating/elo.js';
 
@@ -75,6 +76,14 @@ export async function spawnMatch(args: {
     drawOfferFrom: null,
   };
   rooms.set(room.id, room);
+  // fire-and-forget onchain registration
+  void enqueueRegister({
+    matchId: room.id,
+    whitePlayerId: args.whitePlayerId,
+    blackPlayerId: args.blackPlayerId,
+    initialMs: args.initialMs,
+    incrementMs: args.incrementMs,
+  });
   return room;
 }
 
@@ -135,6 +144,15 @@ export async function playMove(
 
   await recordMove({
     matchId: room.id,
+    ply: result.ply,
+    san: result.san,
+    uci: result.uci,
+    fenAfter: result.fenAfter,
+    clockMsWhite: clockUpdate.whiteMs,
+    clockMsBlack: clockUpdate.blackMs,
+    thinkMs: clockUpdate.thinkMs,
+  });
+  void enqueueMove(room.id, {
     ply: result.ply,
     san: result.san,
     uci: result.uci,
@@ -212,6 +230,13 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number) {
 
   await updateRating({ userId: room.whitePlayerId, category: room.tc.category, newRating: elo.whiteAfter });
   await updateRating({ userId: room.blackPlayerId, category: room.tc.category, newRating: elo.blackAfter });
+  void enqueueFinalize({
+    matchId: room.id,
+    status: gameOver.outcome as 'WHITE_WON' | 'BLACK_WON' | 'DRAW' | 'ABORTED',
+    resultReason: gameOver.reason,
+    finalFen: room.game.fen(),
+    pgn: room.game.pgn(),
+  });
 }
 
 // Test/cleanup helper
