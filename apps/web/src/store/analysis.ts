@@ -30,11 +30,40 @@ export interface EngineReport {
   error?: string;
 }
 
+export interface PhaseAssessment {
+  name?: string | null;
+  eco?: string | null;
+  type?: string | null;
+  structure?: string | null;
+  plans?: string | null;
+  assessment: string | null;
+}
+
+export interface TurningPoint {
+  ply: number;
+  san: string;
+  best_san: string;
+  what_happened: string;
+  tactical_motif?: string | null;
+}
+
+export interface LlmReport {
+  summary?: string;
+  opening?: PhaseAssessment;
+  middlegame?: PhaseAssessment;
+  endgame?: PhaseAssessment;
+  turning_points?: TurningPoint[];
+  themes?: string[];
+  advice?: { white?: string; black?: string };
+  // graceful fallback if model returned non-JSON
+  raw?: string;
+}
+
 export interface AnalysisReport {
   matchId: string;
   engineReport: EngineReport | { error: string };
   llmSummary: string;
-  llmReport: Record<string, unknown>;
+  llmReport: LlmReport;
   alternatives: Array<unknown>;
   generatedAt: string;
 }

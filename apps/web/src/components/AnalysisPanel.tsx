@@ -5,6 +5,7 @@ import { clsx } from 'clsx';
 import { API_BASE } from '@/lib/config';
 import { useMatch } from '@/store/match';
 import { useAnalysis, type MoveClass, type PerMove, type EngineReport } from '@/store/analysis';
+import { CoachNotes } from './CoachNotes';
 
 const DOT: Record<MoveClass, string> = {
   good:       'bg-accent',
@@ -91,11 +92,14 @@ export function AnalysisPanel() {
   const [status, setStatus] = useState<'idle' | 'pending' | 'ready' | 'error'>('idle');
 
   // Poll the API until report is available (after game ends).
+  // Keep polling until BOTH engine analysis AND LLM coaching are present.
+  const llmReady = !!(report?.llmReport?.summary || report?.llmReport?.raw || report?.llmSummary);
   useEffect(() => {
-    if (!matchId || !ended || report) return;
+    if (!matchId || !ended) return;
+    if (report && llmReady) return;
     let stopped = false;
     let attempts = 0;
-    setStatus('pending');
+    if (!report) setStatus('pending');
     const tick = async () => {
       attempts += 1;
       try {
@@ -105,18 +109,20 @@ export function AnalysisPanel() {
           if (!stopped) {
             setReport(matchId, j);
             setStatus('ready');
+            const haveLlm = !!(j?.llmReport?.summary || j?.llmReport?.raw || j?.llmSummary);
+            if (haveLlm) return;
           }
-          return;
+        } else if (res.status !== 404 && !stopped) {
+          setStatus('error');
         }
-        if (res.status !== 404 && !stopped) setStatus('error');
       } catch {
         /* keep polling */
       }
-      if (!stopped && attempts < 60) setTimeout(tick, 5_000); // up to 5 min
+      if (!stopped && attempts < 120) setTimeout(tick, 5_000); // ~10 min
     };
     void tick();
     return () => { stopped = true; };
-  }, [matchId, ended, report, setReport]);
+  }, [matchId, ended, report, llmReady, setReport]);
 
   if (!matchId) return null;
 
@@ -147,7 +153,16 @@ export function AnalysisPanel() {
   }
 
   return (
-    <div className="flex flex-col gap-3 max-h-[24rem]">
+    <div className="flex flex-col gap-4 max-h-[36rem] overflow-y-auto pr-1">
+      {report.llmReport && (
+        <CoachNotes report={report.llmReport} summary={report.llmSummary || null} />
+      )}
+      {!llmReady && (
+        <div className="flex items-center gap-2 text-xs text-ink-400">
+          <span className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
+          Coach analysis is being generated onchain…
+        </div>
+      )}
       <div className="rounded-xl border border-parchment-300 bg-parchment-50 p-3">
         <AccuracyBar label="White accuracy" pct={eng.whiteAccuracy} />
         <AccuracyBar label="Black accuracy" pct={eng.blackAccuracy} />
