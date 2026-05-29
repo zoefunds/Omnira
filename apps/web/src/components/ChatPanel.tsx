@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { API_BASE } from '@/lib/config';
 import { useAuth } from '@/store/auth';
+import Link from 'next/link';
 import { useChat, type ChatItem } from '@/store/chat';
 
 const EMPTY: ChatItem[] = [];
@@ -82,9 +83,10 @@ export function ChatPanel({ matchId, socket }: Props) {
           return (
             <div key={m.id} className="text-sm leading-snug">
               <div className="flex items-baseline gap-2">
-                <span className={`font-medium ${mine ? 'text-accent' : 'text-ink-900'}`}>
+                <Link href={m.senderUsername ? `/u/${m.senderUsername}` : '#'}
+                  className={`font-medium hover:underline ${mine ? 'text-accent' : 'text-ink-900'}`}>
                   {m.senderUsername ?? 'anon'}
-                </span>
+                </Link>
                 <span className="text-[10px] text-ink-400">{fmtTime(m.createdAt)}</span>
               </div>
               <div className="text-ink-900 break-words">{m.body}</div>

@@ -173,3 +173,76 @@ export interface ApiActiveTournamentMatch {
 api.listActiveMatches = (id: string) =>
   request<{ matches: ApiActiveTournamentMatch[] }>(`/tournaments/${id}/active-matches`, { method: 'GET' });
 
+// ────────── Users / profiles ──────────
+
+export interface ApiProfile {
+  id: string;
+  username: string;
+  walletAddress: string | null;
+  memberSince: string;
+  ratings: Array<{
+    category: 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL';
+    rating: number;
+    gamesPlayed: number;
+    ratingDev: number;
+  }>;
+}
+
+export interface ApiProfileMatch {
+  id: string;
+  status: string;
+  resultReason: string | null;
+  category: string;
+  initialTimeSec: number;
+  incrementSec: number;
+  whitePlayerId: string;
+  blackPlayerId: string;
+  whiteRatingBefore: number | null;
+  blackRatingBefore: number | null;
+  whiteRatingAfter: number | null;
+  blackRatingAfter: number | null;
+  tournamentId: string | null;
+  createdAt: string;
+  endedAt: string | null;
+  whitePlayer: { id: string; username: string };
+  blackPlayer: { id: string; username: string };
+  analysis: { matchId: string; llmSummary: string } | null;
+}
+
+export interface ApiProfileTournament {
+  id: string;
+  score: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  withdrew: boolean;
+  tournament: {
+    id: string;
+    name: string;
+    status: 'UPCOMING' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+    startsAt: string;
+    endsAt: string;
+    category: string;
+    initialMs: number;
+    incrementMs: number;
+    winnerId: string | null;
+  };
+}
+
+export interface ApiAnalyzedMatch {
+  id: string;
+  status: string;
+  category: string;
+  createdAt: string;
+  endedAt: string | null;
+  whitePlayer: { id: string; username: string };
+  blackPlayer: { id: string; username: string };
+  analysis: { llmSummary: string };
+}
+
+api.getProfile = (username: string) => request<{ profile: ApiProfile }>(`/users/${username}`, { method: 'GET' });
+api.getProfileMatches = (username: string) => request<{ matches: ApiProfileMatch[] }>(`/users/${username}/matches`, { method: 'GET' });
+api.getProfileRatings = (username: string) => request<{ history: Record<string, Array<{ at: string; rating: number }>> }>(`/users/${username}/ratings`, { method: 'GET' });
+api.getProfileTournaments = (username: string) => request<{ tournaments: ApiProfileTournament[] }>(`/users/${username}/tournaments`, { method: 'GET' });
+api.getProfileAnalyses = (username: string) => request<{ matches: ApiAnalyzedMatch[] }>(`/users/${username}/analyses`, { method: 'GET' });
+
