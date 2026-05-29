@@ -102,6 +102,17 @@ export function attachRealtime(app: FastifyInstance): Server {
       ack?.({ ok: true });
     });
 
+
+    s.on('match:watch', async (payload: { matchId: string }, ack) => {
+      if (!/^[0-9a-fA-F-]{36}$/.test(payload.matchId)) return ack?.({ ok: false, error: 'BAD_ID' });
+      s.join(`match:${payload.matchId}`);
+      ack?.({ ok: true });
+    });
+    s.on('match:unwatch', async (payload: { matchId: string }, ack) => {
+      s.leave(`match:${payload.matchId}`);
+      ack?.({ ok: true });
+    });
+
     s.on('match:move', async (payload: { matchId: string; uci: string }, ack) => {
       const room = getRoom(payload.matchId);
       if (!room) return ack?.({ ok: false, error: 'NO_MATCH' });

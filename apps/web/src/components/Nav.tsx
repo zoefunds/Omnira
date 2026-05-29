@@ -25,6 +25,7 @@ export function Nav() {
             <>
               <Link href="/lobby" className="text-ink-600 hover:text-ink-900">Lobby</Link>
               <Link href="/tournaments" className="text-ink-600 hover:text-ink-900">Tournaments</Link>
+              <Link href="/watch" className="text-ink-600 hover:text-ink-900">Watch</Link>
               <Link href={`/u/${user.username}`} className="text-ink-600 hover:text-ink-900">{user.username}</Link>
               <span
                 className="font-mono text-xs text-ink-400"

@@ -246,3 +246,48 @@ api.getProfileRatings = (username: string) => request<{ history: Record<string, 
 api.getProfileTournaments = (username: string) => request<{ tournaments: ApiProfileTournament[] }>(`/users/${username}/tournaments`, { method: 'GET' });
 api.getProfileAnalyses = (username: string) => request<{ matches: ApiAnalyzedMatch[] }>(`/users/${username}/analyses`, { method: 'GET' });
 
+// ────────── Spectator ──────────
+
+export interface ApiSiteActiveMatch {
+  id: string;
+  whitePlayer: { id: string; username: string };
+  blackPlayer: { id: string; username: string };
+  category: string;
+  initialTimeSec: number;
+  incrementSec: number;
+  tournamentId: string | null;
+  startedAt: string;
+  currentFen: string | null;
+  ply: number;
+}
+
+export interface ApiMatchState {
+  id: string;
+  status: string;
+  resultReason: string | null;
+  category: string;
+  initialTimeSec: number;
+  incrementSec: number;
+  whitePlayer: { id: string; username: string };
+  blackPlayer: { id: string; username: string };
+  whiteRatingBefore: number | null;
+  blackRatingBefore: number | null;
+  whiteRatingAfter: number | null;
+  blackRatingAfter: number | null;
+  finalFen: string | null;
+  currentFen: string | null;
+  pgn: string | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  tournamentId: string | null;
+  onchainMatchId: string | null;
+  onchainTxHash: string | null;
+  onchainSettledAt: string | null;
+  moves: Array<{ ply: number; san: string; uci: string; fenAfter: string; clockMsWhite: number; clockMsBlack: number }>;
+}
+
+api.listActiveSiteMatches = () =>
+  request<{ matches: ApiSiteActiveMatch[] }>(`/matches/active`, { method: 'GET' });
+api.getMatchState = (matchId: string) =>
+  request<{ match: ApiMatchState }>(`/match/${matchId}`, { method: 'GET' });
+
