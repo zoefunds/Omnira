@@ -20,8 +20,10 @@ export function Nav() {
           Omnira
         </Link>
         <nav className="flex items-center gap-4 text-sm">
+          {/* Lobby link (visible when authed) */}
           {user ? (
             <>
+              <Link href="/lobby" className="text-ink-600 hover:text-ink-900">Lobby</Link>
               <span className="text-ink-600">{user.username}</span>
               <span
                 className="font-mono text-xs text-ink-400"

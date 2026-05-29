@@ -15,9 +15,8 @@ export async function fundUserWallet(toAddress: `0x${string}`): Promise<`0x${str
     })) as `0x${string}`;
     return hash;
   } catch (e) {
-    console.warn(
-      JSON.stringify({ level: 40, comp: 'funding', toAddress, err: (e as Error).message }),
-    );
+    // Studio Net is gasless and doesn't expose eth_fillTransaction; suppress the noise.
+    void 0;
     return null;
   }
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/auth';
 import { useMatch } from '@/store/match';
 import { useSocket } from '@/hooks/useSocket';
-import { Lobby } from '@/components/Lobby';
+// /play now only renders the active match; the matchmaking lobby lives at /lobby.
 import { MatchView } from '@/components/MatchView';
 
 export default function PlayPage() {
@@ -71,7 +71,7 @@ export default function PlayPage() {
 
   return (
     <section className="space-y-8">
-      {!inMatch && !hasResult && <Lobby socket={socket} />}
+      {!inMatch && !hasResult && <RedirectToLobby />}
       {(inMatch || hasResult) && <MatchView socket={socket} />}
 
       <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-4 max-w-md text-xs text-ink-400">
@@ -80,4 +80,9 @@ export default function PlayPage() {
       </div>
     </section>
   );
+}
+
+function RedirectToLobby() {
+  if (typeof window !== 'undefined') window.location.replace('/lobby');
+  return null;
 }

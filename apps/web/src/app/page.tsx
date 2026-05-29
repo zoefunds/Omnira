@@ -18,7 +18,7 @@ export default function HomePage() {
       <div className="mt-8 flex gap-3">
         {user ? (
           <Link
-            href="/play"
+            href="/lobby"
             className="rounded-xl bg-accent px-5 py-2.5 text-parchment-50 hover:bg-accent-hover"
           >
             Play
