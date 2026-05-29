@@ -21,25 +21,27 @@ describe('clock', () => {
     expect(c.turnStartedAt).toBeNull();
   });
 
-  it('first move does not deduct time, increment is NOT applied to mover (Fischer common rule), turn switches', () => {
+  it('first move deducts think time normally and adds increment to mover, then switches turn', () => {
     let c = newClock(blitz5plus3);
     c = startClock(c, 1000);
-    const { next, thinkMs } = onMove(c, blitz5plus3, 1500);
-    expect(thinkMs).toBe(0); // first-move grace
-    expect(next.whiteMs).toBe(300_000);
-    expect(next.turn).toBe('b');
+    const r = onMove(c, blitz5plus3, 1500); // white thought for 500ms
+    expect(r.thinkMs).toBe(500);
+    // -500ms +3000ms increment = +2500ms net
+    expect(r.next.whiteMs).toBe(300_000 - 500 + 3000);
+    expect(r.next.turn).toBe('b');
   });
 
   it('subsequent moves deduct think time and add increment to mover', () => {
     let c = newClock(blitz5plus3);
     c = startClock(c, 0);
-    // White moves at t=2000 (took 2s)
+    // White moves at t=2000 (took 2s): -2000 + 3000 = +1000
     let r = onMove(c, blitz5plus3, 2000);
     c = r.next;
-    // Black moves at t=5000 (took 3s) — black should lose 3s and gain 3s increment → net 0
+    expect(c.whiteMs).toBe(301_000);
+    // Black moves at t=5000 (took 3s): -3000 + 3000 = 0
     r = onMove(c, blitz5plus3, 5000);
     expect(r.thinkMs).toBe(3000);
-    expect(r.blackMs).toBe(300_000); // 300000 - 3000 + 3000
+    expect(r.blackMs).toBe(300_000);
     expect(r.next.turn).toBe('w');
   });
 

@@ -61,7 +61,7 @@ describe('Game basic play', () => {
     // Use a FEN where promotion is one move away
     const g = Game.fromFen('8/P7/8/8/8/8/8/k6K w - - 0 1');
     const r = g.applyMove('a7a8q');
-    expect(r.san).toBe('a8=Q');
+    expect(r.san).toBe('a8=Q+'); // promotion gives check on the a-file
   });
 
   it('detects insufficient material (K vs K)', () => {
