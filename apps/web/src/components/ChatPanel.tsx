@@ -8,6 +8,14 @@ import { useChat, type ChatItem } from '@/store/chat';
 
 const EMPTY: ChatItem[] = [];
 
+function fmtTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
+
 interface Props {
   matchId: string;
   socket: Socket;
@@ -73,11 +81,13 @@ export function ChatPanel({ matchId, socket }: Props) {
           const mine = m.senderId === user?.id;
           return (
             <div key={m.id} className="text-sm leading-snug">
-              <span className={`font-medium ${mine ? 'text-accent' : 'text-ink-900'}`}>
-                {m.senderUsername}
-              </span>
-              <span className="text-ink-400">: </span>
-              <span className="text-ink-900 break-words">{m.body}</span>
+              <div className="flex items-baseline gap-2">
+                <span className={`font-medium ${mine ? 'text-accent' : 'text-ink-900'}`}>
+                  {m.senderUsername ?? 'anon'}
+                </span>
+                <span className="text-[10px] text-ink-400">{fmtTime(m.createdAt)}</span>
+              </div>
+              <div className="text-ink-900 break-words">{m.body}</div>
             </div>
           );
         })}

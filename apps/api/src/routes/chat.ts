@@ -11,7 +11,15 @@ export async function registerChatRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     try {
       await assertParticipant(id, req.user.sub);
-      const messages = await listMessages(id);
+      const rows = await listMessages(id);
+      const messages = rows.map((m) => ({
+        id: m.id,
+        matchId: m.matchId,
+        senderId: m.senderId,
+        senderUsername: m.sender.username,
+        body: m.body,
+        createdAt: m.createdAt.toISOString(),
+      }));
       return { messages };
     } catch (e) {
       if (e instanceof ChatError) return reply.code(e.status).send({ error: e.code });
