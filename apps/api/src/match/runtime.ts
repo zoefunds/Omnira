@@ -258,6 +258,9 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
       });
       markInGameEnd(room.tournamentId, room.whitePlayerId);
       markInGameEnd(room.tournamentId, room.blackPlayerId);
+      const { broadcastStandings, broadcastQueueSummary } = await import('../tournaments/runtime.js');
+      await broadcastStandings(room.tournamentId);
+      broadcastQueueSummary(room.tournamentId);
     } catch (e) {
       console.error('tournament scoring failed', { matchId: room.id, err: (e as Error).message });
     }

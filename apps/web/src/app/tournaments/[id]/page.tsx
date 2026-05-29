@@ -7,6 +7,9 @@ import { useAuth } from '@/store/auth';
 import { useSocket } from '@/hooks/useSocket';
 import { useMatch } from '@/store/match';
 import { Button } from '@/components/Button';
+import { TournamentPairingCard } from '@/components/TournamentPairingCard';
+import { TournamentActiveMatches } from '@/components/TournamentActiveMatches';
+import { TournamentPodium } from '@/components/TournamentPodium';
 
 function fmtTC(initialMs: number, incrementMs: number) {
   return `${Math.round(initialMs / 60_000)}+${Math.round(incrementMs / 1000)}`;
@@ -34,6 +37,9 @@ export default function TournamentPage() {
   const socket = useSocket(token);
   const matchStore = useMatch();
   const [inQueue, setInQueue] = useState(false);
+  const [readyCount, setReadyCount] = useState(0);
+  const [inGameCount, setInGameCount] = useState(0);
+
 
   // Subscribe to tournament socket room for live updates + match:start routing.
   useEffect(() => {
@@ -53,11 +59,23 @@ export default function TournamentPage() {
     socket.on('match:start', onStart);
     socket.on('tournament:queue:state', onQueueState);
     socket.on('tournament:finished', onFinished);
+    const onQueueSummary = (p: { tournamentId: string; readyCount: number; inGameCount: number }) => {
+      if (p.tournamentId !== id) return;
+      setReadyCount(p.readyCount); setInGameCount(p.inGameCount);
+    };
+    const onStandingsPush = (p: { tournamentId: string; standings: ApiTournamentPlayer[] }) => {
+      if (p.tournamentId !== id) return;
+      setStandings(p.standings);
+    };
+    socket.on('tournament:queue:summary', onQueueSummary);
+    socket.on('tournament:standings', onStandingsPush);
     return () => {
       socket.emit('tournament:unsubscribe', { tournamentId: id }, () => {});
       socket.off('match:start', onStart);
       socket.off('tournament:queue:state', onQueueState);
       socket.off('tournament:finished', onFinished);
+      socket.off('tournament:queue:summary', onQueueSummary);
+      socket.off('tournament:standings', onStandingsPush);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket, user?.id, id]);
@@ -139,16 +157,18 @@ export default function TournamentPage() {
         </ol>
       </div>
 
-      {t.status === 'ACTIVE' && (
-        <p className="text-xs text-ink-400">
-          {inQueue ? 'Searching for an opponent in this arena…' : 'Join the queue to be paired with another arena participant.'}
-        </p>
+      {t.status === 'ACTIVE' && mine && !mine.withdrew && (
+        <TournamentPairingCard
+          inQueue={inQueue}
+          readyCount={readyCount}
+          inGameCount={inGameCount}
+          onToggle={toggleQueue}
+        />
       )}
-      {t.status === 'FINISHED' && t.winnerId && (
-        <p className="text-sm text-ink-900">
-          🏆 Winner: <span className="font-medium">{standings.find((sp) => sp.userId === t.winnerId)?.user.username ?? 'unknown'}</span>
-        </p>
-      )}
+
+      {t.status === 'ACTIVE' && <TournamentActiveMatches tournamentId={id} />}
+
+      {t.status === 'FINISHED' && <TournamentPodium standings={standings} />}
     </section>
   );
 }

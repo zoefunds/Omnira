@@ -39,6 +39,27 @@ export async function registerTournamentRoutes(app: FastifyInstance) {
     return { standings };
   });
 
+  app.get('/tournaments/:id/active-matches', { config: { rateLimit: false } }, async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!UUID_RE.test(id)) return reply.code(400).send({ error: 'BAD_ID' });
+    const { prisma } = await import('@omnira/db');
+    const matches = await prisma.match.findMany({
+      where: { tournamentId: id, status: 'ACTIVE' },
+      select: {
+        id: true,
+        whitePlayerId: true,
+        blackPlayerId: true,
+        finalFen: true,
+        whitePlayer: { select: { id: true, username: true } },
+        blackPlayer: { select: { id: true, username: true } },
+        startedAt: true,
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 20,
+    });
+    return { matches };
+  });
+
   app.post('/tournaments', async (req, reply) => {
     try { await req.jwtVerify(); } catch { return reply.code(401).send({ error: 'UNAUTHORIZED' }); }
     const parsed = CreateBody.safeParse(req.body);

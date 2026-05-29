@@ -156,3 +156,16 @@ api.joinTournament = (id: string, token: string) =>
 api.withdrawTournament = (id: string, token: string) =>
   request<{ ok: boolean }>(`/tournaments/${id}/withdraw`, { method: 'POST', token, body: '{}' });
 
+export interface ApiActiveTournamentMatch {
+  id: string;
+  whitePlayerId: string;
+  blackPlayerId: string;
+  finalFen: string | null;
+  whitePlayer: { id: string; username: string };
+  blackPlayer: { id: string; username: string };
+  startedAt: string;
+}
+
+api.listActiveMatches = (id: string) =>
+  request<{ matches: ApiActiveTournamentMatch[] }>(`/tournaments/${id}/active-matches`, { method: 'GET' });
+

@@ -24,6 +24,24 @@ function getInGame(tid: string) {
 export function markReady(tournamentId: string, userId: string) {
   getReady(tournamentId).add(userId);
 }
+
+export function getReadyCount(tournamentId: string) { return getReady(tournamentId).size; }
+export function getInGameCount(tournamentId: string) { return getInGame(tournamentId).size; }
+
+let ioRef: Server | null = null;
+export function broadcastQueueSummary(tournamentId: string) {
+  if (!ioRef) return;
+  ioRef.to(`tournament:${tournamentId}`).emit('tournament:queue:summary', {
+    tournamentId,
+    readyCount: getReadyCount(tournamentId),
+    inGameCount: getInGameCount(tournamentId),
+  });
+}
+export async function broadcastStandings(tournamentId: string) {
+  if (!ioRef) return;
+  const standings = await listStandings(tournamentId, 100);
+  ioRef.to(`tournament:${tournamentId}`).emit('tournament:standings', { tournamentId, standings });
+}
 export function markNotReady(tournamentId: string, userId: string) {
   getReady(tournamentId).delete(userId);
 }
@@ -121,6 +139,7 @@ export function startTournamentRuntime(
   io: Server,
   spawnMatchFn: Parameters<typeof pairOneActiveTournament>[2],
 ): () => void {
+  ioRef = io;
   // Status transitions every 10s.
   statusInterval = setInterval(async () => {
     try {
