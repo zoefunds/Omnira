@@ -7,8 +7,9 @@ import { Button } from './Button';
 import { useMatch } from '@/store/match';
 import { ChatPanel } from './ChatPanel';
 import { OnchainBadge } from './OnchainBadge';
+import { AnalysisPanel } from './AnalysisPanel';
 
-type Tab = 'moves' | 'chat' | 'chain';
+type Tab = 'moves' | 'chat' | 'chain' | 'analysis';
 
 interface Props {
   socket: Socket;
@@ -44,6 +45,7 @@ export function MatchSidebar({ socket }: Props) {
           ['moves', 'Moves'],
           ['chat', 'Chat'],
           ['chain', 'Onchain'],
+          ['analysis', 'Analysis'],
         ] as const).map(([key, label]) => (
           <button
             key={key}
@@ -78,6 +80,8 @@ export function MatchSidebar({ socket }: Props) {
         {tab === 'chat' && <ChatPanel matchId={matchId} socket={socket} />}
 
         {tab === 'chain' && <OnchainBadge />}
+
+        {tab === 'analysis' && <AnalysisPanel />}
       </div>
 
       {/* Game controls — always visible at the bottom while live */}
