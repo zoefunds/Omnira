@@ -1,6 +1,7 @@
 import { prisma } from '@omnira/db';
 import { Stockfish, analyzeGame } from '@omnira/chess-engine';
 import { env } from './env.js';
+import { runLlmAnalysis } from './llm.js';
 
 function log(msg: string, extra?: Record<string, unknown>) {
   console.log(JSON.stringify({ level: 30, comp: 'worker', msg, ...extra }));
@@ -47,6 +48,10 @@ export async function analyzeOne(matchId: string, sf: Stockfish): Promise<void> 
     blackAccuracy: Math.round(report.blackAccuracy),
     whiteCounts: report.whiteCounts, blackCounts: report.blackCounts,
   });
+
+  // Fire the LLM stage. This can take 30-120s on Studio Net; it's a separate concern
+  // from engine analysis and failures are non-fatal.
+  await runLlmAnalysis(matchId, report, m.pgn);
 }
 
 export { log as workerLog, logErr as workerErr };
