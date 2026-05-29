@@ -157,6 +157,7 @@ model Match {
   analysis        AnalysisReport?
   chat            ChatMessage[]
   challenge       Challenge?
+  alternatives    Alternative[]
 
   @@index([status, createdAt])
   @@index([whitePlayerId])
@@ -260,5 +261,49 @@ model ChatMessage {
   createdAt DateTime @default(now())
 
   @@index([matchId, createdAt])
+}
+
+// ─────────────────────────── ALTERNATIVE-MOVE SIMS ───────────────────────────
+
+enum AlternativeStatus {
+  PENDING
+  COMPLETE
+  FAILED
+}
+
+model Alternative {
+  id              String              @id @default(uuid()) @db.Uuid
+  matchId         String              @db.Uuid
+  match           Match               @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  ply             Int
+  /// UCI form of the alternative move (e.g. "e2e4", "e7e8q")
+  alternativeUci  String
+  /// SAN of the alternative move once validated against fenBefore
+  alternativeSan  String
+
+  /// FEN of the position before the move at this ply (snapshot)
+  fenBefore       String
+
+  /// Eval AT THE ORIGINAL MOVE (for comparison)
+  playedSan       String
+  playedEvalCp    Int?
+  playedEvalMate  Int?
+
+  /// Eval AT THE ALTERNATIVE MOVE
+  altEvalCp       Int?
+  altEvalMate     Int?
+
+  /// Centipawn delta vs played; positive = alternative is better for the mover
+  cpDelta         Int?
+
+  status          AlternativeStatus   @default(PENDING)
+  errorMessage    String?
+  createdAt       DateTime            @default(now())
+  completedAt     DateTime?
+
+  @@unique([matchId, ply, alternativeUci])
+  @@index([status, createdAt])
+  @@index([matchId, ply])
 }
 
