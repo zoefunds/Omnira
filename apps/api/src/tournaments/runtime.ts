@@ -1,6 +1,9 @@
 import type { Server } from 'socket.io';
 import { prisma } from '@omnira/db';
 import { tickTournamentStatuses, listStandings } from './service.js';
+import { deriveAddress } from '../wallet/derive.js';
+import { registerTournamentOnchain, finalizeTournamentOnchain } from '../onchain/tournamentRegistry.js';
+import { prisma as _prisma } from '@omnira/db';
 
 /**
  * Per-tournament "ready" set: users who have opted into pairing for this tournament.
@@ -146,12 +149,57 @@ export function startTournamentRuntime(
       const { activated, finished } = await tickTournamentStatuses();
       for (const id of activated) {
         io.to(`tournament:${id}`).emit('tournament:activated', { id });
+        void (async () => {
+          try {
+            const t = await _prisma.tournament.findUnique({ where: { id } });
+            if (!t) return;
+            const hostAddress = await deriveAddress(t.createdById);
+            const tx = await registerTournamentOnchain({
+              tournamentId: id,
+              hostUserId: t.createdById,
+              hostAddress,
+              name: t.name,
+              initialMs: t.initialMs,
+              incrementMs: t.incrementMs,
+              startsAtSec: Math.floor(t.startsAt.getTime() / 1000),
+              durationMs: t.durationMs,
+            });
+            await _prisma.tournament.update({ where: { id }, data: { onchainTxHash: tx } });
+            console.log(JSON.stringify({ level: 30, comp: 'tournament/onchain', msg: 'registered', id, tx }));
+          } catch (e) {
+            console.log(JSON.stringify({ level: 50, comp: 'tournament/onchain', msg: 'register failed', id, err: (e as Error).message }));
+          }
+        })();
       }
       for (const id of finished) {
         const standings = await listStandings(id, 50);
         io.to(`tournament:${id}`).emit('tournament:finished', { id, standings });
         ready.delete(id);
         inGame.delete(id);
+        void (async () => {
+          try {
+            const t = await _prisma.tournament.findUnique({ where: { id } });
+            if (!t || !t.onchainTxHash) return;
+            const top = standings.slice(0, 10);
+            if (top.length === 0) return;
+            const entries = await Promise.all(top.map(async (p, i) => ({
+              rank: i + 1,
+              playerAddress: await deriveAddress(p.userId),
+              score: p.score,
+              wins: p.wins,
+              losses: p.losses,
+              draws: p.draws,
+            })));
+            const tx = await finalizeTournamentOnchain(id, t.createdById, entries);
+            await _prisma.tournament.update({
+              where: { id },
+              data: { onchainSettledTxHash: tx, onchainSettledAt: new Date() },
+            });
+            console.log(JSON.stringify({ level: 30, comp: 'tournament/onchain', msg: 'finalized', id, tx, top: entries.length }));
+          } catch (e) {
+            console.log(JSON.stringify({ level: 50, comp: 'tournament/onchain', msg: 'finalize failed', id, err: (e as Error).message }));
+          }
+        })();
       }
     } catch (e) {
       console.error('tournament status tick failed', (e as Error).message);

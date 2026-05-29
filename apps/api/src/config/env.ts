@@ -19,6 +19,10 @@ const EnvSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{40}$/)
     .optional(),
+  GENLAYER_TOURNAMENT_REGISTRY_ADDRESS: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
   GENLAYER_SERVICE_PRIVATE_KEY: z
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)

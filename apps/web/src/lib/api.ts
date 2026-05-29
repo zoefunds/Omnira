@@ -103,6 +103,9 @@ export type TournamentStatus = 'UPCOMING' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
 export interface ApiTournament {
   id: string;
   name: string;
+  onchainTxHash?: string | null;
+  onchainSettledTxHash?: string | null;
+  onchainSettledAt?: string | null;
   format: 'ARENA';
   createdById: string;
   createdBy: { id: string; username: string };
