@@ -8,6 +8,7 @@ export async function createMatch(args: {
   incrementMs: number;
   whiteRatingBefore: number;
   blackRatingBefore: number;
+  tournamentId?: string | null;
 }) {
   return prisma.match.create({
     data: {
@@ -20,6 +21,7 @@ export async function createMatch(args: {
       startedAt: new Date(),
       whiteRatingBefore: args.whiteRatingBefore,
       blackRatingBefore: args.blackRatingBefore,
+      tournamentId: args.tournamentId ?? null,
     },
   });
 }

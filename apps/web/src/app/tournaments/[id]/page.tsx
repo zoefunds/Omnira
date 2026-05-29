@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { api, type ApiTournament, type ApiTournamentPlayer } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { useSocket } from '@/hooks/useSocket';
+import { useMatch } from '@/store/match';
 import { Button } from '@/components/Button';
 
 function fmtTC(initialMs: number, incrementMs: number) {
@@ -29,6 +31,43 @@ export default function TournamentPage() {
     } catch { /* ignore */ }
   }
   useEffect(() => { void refresh(); const i = setInterval(refresh, 5_000); return () => clearInterval(i); }, [id]);
+  const socket = useSocket(token);
+  const matchStore = useMatch();
+  const [inQueue, setInQueue] = useState(false);
+
+  // Subscribe to tournament socket room for live updates + match:start routing.
+  useEffect(() => {
+    if (!socket || !user) return;
+    socket.emit('tournament:subscribe', { tournamentId: id }, () => {});
+    const onStart = (p: { matchId: string; whitePlayerId: string; blackPlayerId: string; fen: string; initialMs: number; incrementMs: number; tournamentId?: string }) => {
+      if (p.tournamentId !== id) return;
+      matchStore.onMatchStart({ ...p, myUserId: user.id });
+      router.push('/play');
+    };
+    const onQueueState = (p: { tournamentId: string; userId: string; ready: boolean }) => {
+      if (p.tournamentId !== id) return;
+      if (p.userId === user.id) setInQueue(p.ready);
+      void refresh();
+    };
+    const onFinished = (p: { id: string }) => { if (p.id === id) void refresh(); };
+    socket.on('match:start', onStart);
+    socket.on('tournament:queue:state', onQueueState);
+    socket.on('tournament:finished', onFinished);
+    return () => {
+      socket.emit('tournament:unsubscribe', { tournamentId: id }, () => {});
+      socket.off('match:start', onStart);
+      socket.off('tournament:queue:state', onQueueState);
+      socket.off('tournament:finished', onFinished);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [socket, user?.id, id]);
+
+  function toggleQueue() {
+    if (!socket) return;
+    if (inQueue) socket.emit('tournament:queue:leave', { tournamentId: id }, () => setInQueue(false));
+    else socket.emit('tournament:queue:join', { tournamentId: id }, () => setInQueue(true));
+  }
+
 
   if (!user || !t) return <div className="text-ink-600">Loading…</div>;
 
@@ -66,6 +105,9 @@ export default function TournamentPage() {
         </div>
         <div className="flex gap-2">
           {canJoin && <Button onClick={join} disabled={busy}>{busy ? '…' : 'Join arena'}</Button>}
+          {mine && !mine.withdrew && t.status === 'ACTIVE' && (
+            <Button onClick={toggleQueue}>{inQueue ? 'Leave queue' : 'Join queue'}</Button>
+          )}
           {mine && !mine.withdrew && t.status !== 'FINISHED' && (
             <Button variant="ghost" onClick={withdraw} disabled={busy}>Withdraw</Button>
           )}
@@ -97,9 +139,16 @@ export default function TournamentPage() {
         </ol>
       </div>
 
-      <p className="text-xs text-ink-400">
-        Pairing engine + live standings push lands in Phase 11B/11C. For now, joining + leaderboard layout is in place.
-      </p>
+      {t.status === 'ACTIVE' && (
+        <p className="text-xs text-ink-400">
+          {inQueue ? 'Searching for an opponent in this arena…' : 'Join the queue to be paired with another arena participant.'}
+        </p>
+      )}
+      {t.status === 'FINISHED' && t.winnerId && (
+        <p className="text-sm text-ink-900">
+          🏆 Winner: <span className="font-medium">{standings.find((sp) => sp.userId === t.winnerId)?.user.username ?? 'unknown'}</span>
+        </p>
+      )}
     </section>
   );
 }

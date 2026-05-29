@@ -12,6 +12,8 @@ import { registerAnalysisRoutes } from './routes/analysis.js';
 import { registerAlternativeRoutes } from './routes/alternatives.js';
 import { registerTournamentRoutes } from './routes/tournaments.js';
 import { attachRealtime } from './realtime/socket.js';
+import { spawnMatch } from './match/runtime.js';
+import { startTournamentRuntime } from './tournaments/runtime.js';
 
 export async function buildServer() {
   const cfg = env();
@@ -37,6 +39,7 @@ export async function buildServer() {
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();
   const io = attachRealtime(app);
+  startTournamentRuntime(io, async (args) => spawnMatch(args));
 
   // Expose for shutdown
   (app as unknown as { io: typeof io }).io = io;

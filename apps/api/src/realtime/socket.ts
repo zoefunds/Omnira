@@ -5,6 +5,7 @@ import { spawnMatch, getRoom, playMove, resign, offerDraw, acceptDraw } from '..
 import { prisma } from '@omnira/db';
 import { acceptChallenge, resolveColors, linkMatch, ChallengeError } from '../lobby/service.js';
 import { postMessage, ChatError } from '../chat/service.js';
+import { markReady, markNotReady } from '../tournaments/runtime.js';
 
 interface AuthedSocket extends Socket {
   data: { userId: string };
@@ -165,6 +166,30 @@ export function attachRealtime(app: FastifyInstance): Server {
 
     s.on('lobby:unsubscribe', async (_payload, ack) => {
       s.leave('lobby:public');
+      ack?.({ ok: true });
+    });
+
+
+    s.on('tournament:subscribe', async (payload: { tournamentId: string }, ack) => {
+      s.join(`tournament:${payload.tournamentId}`);
+      ack?.({ ok: true });
+    });
+    s.on('tournament:unsubscribe', async (payload: { tournamentId: string }, ack) => {
+      s.leave(`tournament:${payload.tournamentId}`);
+      ack?.({ ok: true });
+    });
+    s.on('tournament:queue:join', async (payload: { tournamentId: string }, ack) => {
+      markReady(payload.tournamentId, userId);
+      io.to(`tournament:${payload.tournamentId}`).emit('tournament:queue:state', {
+        tournamentId: payload.tournamentId, userId, ready: true,
+      });
+      ack?.({ ok: true });
+    });
+    s.on('tournament:queue:leave', async (payload: { tournamentId: string }, ack) => {
+      markNotReady(payload.tournamentId, userId);
+      io.to(`tournament:${payload.tournamentId}`).emit('tournament:queue:state', {
+        tournamentId: payload.tournamentId, userId, ready: false,
+      });
       ack?.({ ok: true });
     });
 

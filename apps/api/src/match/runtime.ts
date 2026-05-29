@@ -20,6 +20,7 @@ export interface MatchRoom {
   id: string;                // DB match id
   whitePlayerId: string;
   blackPlayerId: string;
+  tournamentId: string | null;
   tc: TimeControl;
   game: Game;
   clock: ClockState;
@@ -41,6 +42,7 @@ export async function spawnMatch(args: {
   blackPlayerId: string;
   initialMs: number;
   incrementMs: number;
+  tournamentId?: string | null;
 }): Promise<MatchRoom> {
   const category = classify(args.initialMs, args.incrementMs);
   const tc: TimeControl = { category, initialMs: args.initialMs, incrementMs: args.incrementMs };
@@ -60,12 +62,14 @@ export async function spawnMatch(args: {
     incrementMs: args.incrementMs,
     whiteRatingBefore: wRating,
     blackRatingBefore: bRating,
+    tournamentId: args.tournamentId ?? null,
   });
 
   const room: MatchRoom = {
     id: dbMatch.id,
     whitePlayerId: args.whitePlayerId,
     blackPlayerId: args.blackPlayerId,
+    tournamentId: args.tournamentId ?? null,
     tc,
     game: new Game(),
     clock: startClock(newClock(tc), Date.now()),
@@ -240,6 +244,24 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
     finalFen: room.game.fen(),
     pgn: room.game.pgn(),
   });
+
+  // Tournament score + ready-set release
+  if (room.tournamentId && gameOver.outcome !== 'ABORTED') {
+    try {
+      const { applyMatchResultToTournament } = await import('../tournaments/scoring.js');
+      const { markInGameEnd } = await import('../tournaments/runtime.js');
+      await applyMatchResultToTournament({
+        tournamentId: room.tournamentId,
+        whitePlayerId: room.whitePlayerId,
+        blackPlayerId: room.blackPlayerId,
+        outcome: gameOver.outcome as 'WHITE_WON' | 'BLACK_WON' | 'DRAW',
+      });
+      markInGameEnd(room.tournamentId, room.whitePlayerId);
+      markInGameEnd(room.tournamentId, room.blackPlayerId);
+    } catch (e) {
+      console.error('tournament scoring failed', { matchId: room.id, err: (e as Error).message });
+    }
+  }
 }
 
 // Test/cleanup helper
