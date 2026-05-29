@@ -1,0 +1,38 @@
+# deps
+node_modules
+.pnpm-store
+
+# build
+dist
+.next
+.turbo
+*.tsbuildinfo
+
+# env — NEVER COMMIT
+.env
+.env.local
+.env.*.local
+
+# logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# os
+.DS_Store
+Thumbs.db
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# prisma
+prisma/*.db
+prisma/*.db-journal
+
+# misc
+.vscode/
+.idea/
+coverage/
