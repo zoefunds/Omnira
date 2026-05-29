@@ -160,7 +160,8 @@ export interface ApiActiveTournamentMatch {
   id: string;
   whitePlayerId: string;
   blackPlayerId: string;
-  finalFen: string | null;
+  currentFen: string | null;
+  ply: number;
   whitePlayer: { id: string; username: string };
   blackPlayer: { id: string; username: string };
   startedAt: string;

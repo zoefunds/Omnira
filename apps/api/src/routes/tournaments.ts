@@ -43,7 +43,7 @@ export async function registerTournamentRoutes(app: FastifyInstance) {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) return reply.code(400).send({ error: 'BAD_ID' });
     const { prisma } = await import('@omnira/db');
-    const matches = await prisma.match.findMany({
+    const rows = await prisma.match.findMany({
       where: { tournamentId: id, status: 'ACTIVE' },
       select: {
         id: true,
@@ -53,10 +53,21 @@ export async function registerTournamentRoutes(app: FastifyInstance) {
         whitePlayer: { select: { id: true, username: true } },
         blackPlayer: { select: { id: true, username: true } },
         startedAt: true,
+        moves: { orderBy: { ply: 'desc' }, take: 1, select: { fenAfter: true, ply: true } },
       },
       orderBy: { startedAt: 'desc' },
       take: 20,
     });
+    const matches = rows.map((m) => ({
+      id: m.id,
+      whitePlayerId: m.whitePlayerId,
+      blackPlayerId: m.blackPlayerId,
+      whitePlayer: m.whitePlayer,
+      blackPlayer: m.blackPlayer,
+      startedAt: m.startedAt,
+      currentFen: m.moves[0]?.fenAfter ?? null,
+      ply: m.moves[0]?.ply ?? 0,
+    }));
     return { matches };
   });
 
