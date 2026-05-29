@@ -6,6 +6,8 @@ import { API_BASE } from '@/lib/config';
 import { useAuth } from '@/store/auth';
 import { useChat, type ChatItem } from '@/store/chat';
 
+const EMPTY: ChatItem[] = [];
+
 interface Props {
   matchId: string;
   socket: Socket;
@@ -14,7 +16,7 @@ interface Props {
 export function ChatPanel({ matchId, socket }: Props) {
   const user = useAuth((s) => s.user);
   const token = useAuth((s) => s.token);
-  const items = useChat((s) => s.byMatch[matchId] ?? []);
+  const items = useChat((s) => s.byMatch[matchId] ?? EMPTY);
   const setHistory = useChat((s) => s.setHistory);
   const append = useChat((s) => s.append);
   const [draft, setDraft] = useState('');
