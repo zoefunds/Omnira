@@ -23,6 +23,7 @@
     "@scure/btc-signer": "^1.4.0",
     "argon2": "^0.41.1",
     "fastify": "^5.1.0",
+    "genlayer-js": "^1.1.8",
     "ioredis": "^5.4.1",
     "socket.io": "^4.8.0",
     "viem": "^2.21.45",

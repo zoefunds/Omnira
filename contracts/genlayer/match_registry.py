@@ -2,21 +2,16 @@
 """
 Omnira — MatchRegistry Intelligent Contract.
 
-Stores chess matches and their moves onchain. Each match is identified by
-the Omnira backend's UUID (a string). The address that calls register_match
-becomes the `registrar` for that match — the only address allowed to submit
-moves or finalize.
-
-Move data is stored as compact JSON strings to keep calldata simple and
-batch-friendly (bullet chess can't pay a tx per ply, so the backend batches).
+Stores matches and their moves onchain. Moves are stored as a flat
+TreeMap keyed by "{match_id}|{ply}" instead of nested DynArray, because
+GenLayer storage forbids user-instantiating DynArray. The MatchRecord's
+move_count tells you how many keys exist (1..move_count).
 """
 
 from genlayer import *
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-
-# ─── Stored types ──────────────────────────────────────────────────────────
 
 @allow_storage
 @dataclass
@@ -26,10 +21,10 @@ class MatchRecord:
     registrar: Address
     initial_ms: u256
     increment_ms: u256
-    started_at: u256       # unix seconds
-    ended_at: u256         # 0 while ACTIVE
-    status: str            # "ACTIVE" | "WHITE_WON" | "BLACK_WON" | "DRAW" | "ABORTED"
-    result_reason: str     # "" while ACTIVE
+    started_at: u256
+    ended_at: u256
+    status: str           # "ACTIVE" | "WHITE_WON" | "BLACK_WON" | "DRAW" | "ABORTED"
+    result_reason: str    # "" while ACTIVE
     final_fen: str
     pgn: str
     move_count: u256
@@ -48,16 +43,14 @@ class MoveRecord:
     submitted_at: u256
 
 
-# ─── Contract ──────────────────────────────────────────────────────────────
-
 class MatchRegistry(gl.Contract):
     matches: TreeMap[str, MatchRecord]
-    moves:   TreeMap[str, DynArray[MoveRecord]]
+    moves:   TreeMap[str, MoveRecord]   # key = f"{match_id}|{ply}"
 
     def __init__(self):
         pass
 
-    # ── helpers ────────────────────────────────────────────────────────────
+    # ── helpers ──────────────────────────────────────────────────────
 
     def _now(self) -> u256:
         return u256(int(datetime.now(timezone.utc).timestamp()))
@@ -70,7 +63,10 @@ class MatchRegistry(gl.Contract):
             raise Exception("only the original registrar may modify this match")
         return rec
 
-    # ── writes ─────────────────────────────────────────────────────────────
+    def _move_key(self, match_id: str, ply: int) -> str:
+        return f"{match_id}|{ply}"
+
+    # ── writes ───────────────────────────────────────────────────────
 
     @gl.public.write
     def register_match(
@@ -83,7 +79,6 @@ class MatchRegistry(gl.Contract):
     ) -> None:
         if match_id in self.matches:
             raise Exception(f"match already registered: {match_id}")
-
         self.matches[match_id] = MatchRecord(
             white_address=white_address,
             black_address=black_address,
@@ -98,7 +93,6 @@ class MatchRegistry(gl.Contract):
             pgn="",
             move_count=u256(0),
         )
-        self.moves[match_id] = DynArray[MoveRecord]()
 
     @gl.public.write
     def submit_moves_batch(
@@ -122,16 +116,12 @@ class MatchRegistry(gl.Contract):
             raise Exception("batch arrays must be the same length")
 
         now = self._now()
-        bucket = self.moves[match_id]
-        expected_next = rec.move_count + u256(1)
-
+        expected = int(rec.move_count) + 1
         i = 0
         while i < n:
-            if plies[i] != expected_next:
-                raise Exception(
-                    f"out-of-order ply: expected {int(expected_next)}, got {int(plies[i])}"
-                )
-            bucket.append(MoveRecord(
+            if int(plies[i]) != expected:
+                raise Exception(f"out-of-order ply: expected {expected}, got {int(plies[i])}")
+            self.moves[self._move_key(match_id, expected)] = MoveRecord(
                 ply=plies[i],
                 san=sans[i],
                 uci=ucis[i],
@@ -140,11 +130,11 @@ class MatchRegistry(gl.Contract):
                 clock_ms_black=clocks_ms_black[i],
                 think_ms=think_mss[i],
                 submitted_at=now,
-            ))
-            expected_next = expected_next + u256(1)
+            )
+            expected += 1
             i += 1
 
-        rec.move_count = u256(int(expected_next) - 1)
+        rec.move_count = u256(expected - 1)
         self.matches[match_id] = rec
 
     @gl.public.write
@@ -169,7 +159,7 @@ class MatchRegistry(gl.Contract):
         rec.ended_at = self._now()
         self.matches[match_id] = rec
 
-    # ── views ──────────────────────────────────────────────────────────────
+    # ── views ────────────────────────────────────────────────────────
 
     @gl.public.view
     def match_exists(self, match_id: str) -> bool:
@@ -182,13 +172,14 @@ class MatchRegistry(gl.Contract):
         return self.matches[match_id]
 
     @gl.public.view
-    def get_moves(self, match_id: str) -> DynArray[MoveRecord]:
-        if match_id not in self.matches:
-            raise Exception(f"unknown match: {match_id}")
-        return self.moves[match_id]
-
-    @gl.public.view
     def get_move_count(self, match_id: str) -> u256:
         if match_id not in self.matches:
             raise Exception(f"unknown match: {match_id}")
         return self.matches[match_id].move_count
+
+    @gl.public.view
+    def get_move(self, match_id: str, ply: u256) -> MoveRecord:
+        key = self._move_key(match_id, int(ply))
+        if key not in self.moves:
+            raise Exception(f"no move at ply {int(ply)}")
+        return self.moves[key]

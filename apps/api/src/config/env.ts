@@ -7,17 +7,22 @@ const EnvSchema = z.object({
   DATABASE_URL: z.string().url(),
   REDIS_URL: z.string().url(),
 
-  JWT_SECRET: z.string().min(64, 'JWT_SECRET must be ≥ 64 chars'),
+  JWT_SECRET: z.string().min(64),
   JWT_TTL: z.string().default('7d'),
 
-  WALLET_MASTER_SECRET: z
-    .string()
-    .min(64, 'WALLET_MASTER_SECRET must be ≥ 64 chars (use openssl rand -hex 64)'),
+  WALLET_MASTER_SECRET: z.string().min(64),
   WALLET_DERIVATION_VERSION: z.string().default('v1'),
 
   GENLAYER_RPC_URL: z.string().url(),
   GENLAYER_CHAIN_ID: z.string().optional(),
-  GENLAYER_MATCH_REGISTRY_ADDRESS: z.string().optional(),
+  GENLAYER_MATCH_REGISTRY_ADDRESS: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{40}$/)
+    .optional(),
+  GENLAYER_SERVICE_PRIVATE_KEY: z
+    .string()
+    .regex(/^0x[a-fA-F0-9]{64}$/)
+    .optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
@@ -35,7 +40,12 @@ export function env(): Env {
   return cached;
 }
 
-/** Test-only — re-read env vars on next call. */
 export function __resetEnvCache(): void {
   cached = undefined;
+}
+
+/** True iff the API can talk to the chain. */
+export function onchainEnabled(): boolean {
+  const e = env();
+  return !!(e.GENLAYER_MATCH_REGISTRY_ADDRESS && e.GENLAYER_SERVICE_PRIVATE_KEY);
 }
