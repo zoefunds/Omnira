@@ -95,3 +95,64 @@ export const api = {
     });
   },
 };
+
+// ────────── Tournaments ──────────
+
+export type TournamentStatus = 'UPCOMING' | 'ACTIVE' | 'FINISHED' | 'CANCELLED';
+
+export interface ApiTournament {
+  id: string;
+  name: string;
+  format: 'ARENA';
+  createdById: string;
+  createdBy: { id: string; username: string };
+  category: 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL';
+  initialMs: number;
+  incrementMs: number;
+  rated: boolean;
+  startsAt: string;
+  durationMs: number;
+  endsAt: string;
+  status: TournamentStatus;
+  winnerId: string | null;
+  _count: { players: number };
+}
+
+export interface ApiTournamentPlayer {
+  id: string;
+  tournamentId: string;
+  userId: string;
+  user: { id: string; username: string };
+  score: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  currentStreak: number;
+  hasStreakBonus: boolean;
+  ratingAtStart: number | null;
+  joinedAt: string;
+  withdrew: boolean;
+}
+
+export interface CreateTournamentBody {
+  name: string;
+  initialMs: number;
+  incrementMs: number;
+  rated?: boolean;
+  startsAt: string;       // ISO
+  durationMs: number;
+}
+
+api.listTournaments = (status?: TournamentStatus) =>
+  request<{ tournaments: ApiTournament[] }>(`/tournaments${status ? `?status=${status}` : ''}`, { method: 'GET' });
+api.getTournament = (id: string) =>
+  request<{ tournament: ApiTournament }>(`/tournaments/${id}`, { method: 'GET' });
+api.getStandings = (id: string) =>
+  request<{ standings: ApiTournamentPlayer[] }>(`/tournaments/${id}/standings`, { method: 'GET' });
+api.createTournament = (body: CreateTournamentBody, token: string) =>
+  request<{ tournament: ApiTournament }>('/tournaments', { method: 'POST', token, body: JSON.stringify(body) });
+api.joinTournament = (id: string, token: string) =>
+  request<{ player: ApiTournamentPlayer }>(`/tournaments/${id}/join`, { method: 'POST', token, body: '{}' });
+api.withdrawTournament = (id: string, token: string) =>
+  request<{ ok: boolean }>(`/tournaments/${id}/withdraw`, { method: 'POST', token, body: '{}' });
+

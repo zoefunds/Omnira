@@ -32,7 +32,10 @@ model User {
   ratings       Rating[]
   matchesWhite  Match[]  @relation("WhitePlayer")
   matchesBlack       Match[]      @relation("BlackPlayer")
-  challengesCreated  Challenge[]  @relation("ChallengesCreated")
+  challengesCreated      Challenge[]            @relation("ChallengesCreated")
+  tournamentsCreated     Tournament[]           @relation("TournamentsCreated")
+  tournamentsWon         Tournament[]           @relation("TournamentsWon")
+  tournamentParticipations TournamentPlayer[]   @relation("TournamentParticipations")
   challengesAccepted Challenge[]  @relation("ChallengesAccepted")
   chatMessages       ChatMessage[] @relation("ChatMessages")
   sessions      Session[]
@@ -158,6 +161,8 @@ model Match {
   chat            ChatMessage[]
   challenge       Challenge?
   alternatives    Alternative[]
+  tournamentId    String?      @db.Uuid
+  tournament      Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([whitePlayerId])
@@ -305,5 +310,84 @@ model Alternative {
   @@unique([matchId, ply, alternativeUci])
   @@index([status, createdAt])
   @@index([matchId, ply])
+}
+
+// ─────────────────────────── TOURNAMENTS (Arena) ───────────────────────────
+
+enum TournamentFormat {
+  ARENA
+}
+
+enum TournamentStatus {
+  UPCOMING
+  ACTIVE
+  FINISHED
+  CANCELLED
+}
+
+model Tournament {
+  id              String              @id @default(uuid()) @db.Uuid
+  name            String              @db.VarChar(120)
+  format          TournamentFormat    @default(ARENA)
+
+  createdById     String              @db.Uuid
+  createdBy       User                @relation("TournamentsCreated", fields: [createdById], references: [id], onDelete: Cascade)
+
+  category        TimeControlCategory
+  initialMs       Int
+  incrementMs     Int
+  rated           Boolean             @default(true)
+
+  /// Window start. Players can only join until startsAt.
+  startsAt        DateTime
+  /// Total length of the arena, in ms.
+  durationMs      Int
+  /// Convenience column = startsAt + durationMs; helps index queries.
+  endsAt          DateTime
+
+  status          TournamentStatus    @default(UPCOMING)
+  /// Top player at finalization
+  winnerId        String?             @db.Uuid
+  winner          User?               @relation("TournamentsWon", fields: [winnerId], references: [id], onDelete: SetNull)
+
+  /// Onchain registration / finalization tx hashes (Phase 11D)
+  onchainTxHash       String?
+  onchainSettledTxHash String?
+  onchainSettledAt    DateTime?
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  players         TournamentPlayer[]
+  matches         Match[]
+
+  @@index([status, startsAt])
+  @@index([createdById])
+}
+
+model TournamentPlayer {
+  id              String     @id @default(uuid()) @db.Uuid
+  tournamentId    String     @db.Uuid
+  tournament      Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  userId          String     @db.Uuid
+  user            User       @relation("TournamentParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  /// Lichess-style arena points: win=2, draw=1, loss=0; bonus wins=4.
+  score           Int        @default(0)
+  wins            Int        @default(0)
+  losses          Int        @default(0)
+  draws           Int        @default(0)
+  /// Consecutive wins. >=2 enables the streak (subsequent wins doubled).
+  currentStreak   Int        @default(0)
+  /// True when currentStreak >= 2 (so the NEXT win counts as a bonus win).
+  hasStreakBonus  Boolean    @default(false)
+
+  ratingAtStart   Int?
+  joinedAt        DateTime   @default(now())
+  /// User clicked "withdraw" mid-arena.
+  withdrew        Boolean    @default(false)
+
+  @@unique([tournamentId, userId])
+  @@index([tournamentId, score(sort: Desc), wins(sort: Desc)])
 }
 

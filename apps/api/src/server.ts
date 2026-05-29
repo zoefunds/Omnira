@@ -10,6 +10,7 @@ import { registerChallengeRoutes } from './routes/challenges.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerAnalysisRoutes } from './routes/analysis.js';
 import { registerAlternativeRoutes } from './routes/alternatives.js';
+import { registerTournamentRoutes } from './routes/tournaments.js';
 import { attachRealtime } from './realtime/socket.js';
 
 export async function buildServer() {
@@ -31,6 +32,7 @@ export async function buildServer() {
   await registerChatRoutes(app);
   await registerAnalysisRoutes(app);
   await registerAlternativeRoutes(app);
+  await registerTournamentRoutes(app);
 
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();
