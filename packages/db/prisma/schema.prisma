@@ -1,0 +1,198 @@
+// Omnira — Prisma schema
+// Conventions:
+//  - All IDs are UUID v4 (cuid would also work; UUID makes wallet derivation portable).
+//  - Timestamps are UTC.
+//  - Soft deletes via `deletedAt`. Hard delete only for GDPR.
+//  - Enums for finite state machines (match status, time control, result).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── USER & AUTH ───────────────────────────
+
+model User {
+  id            String   @id @default(uuid()) @db.Uuid
+  email         String   @unique
+  emailLower    String   @unique // for case-insensitive lookup
+  username      String   @unique
+  usernameLower String   @unique
+  passwordHash  String   // argon2id — see Phase 3
+  emailVerified Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  wallet        Wallet?
+  ratings       Rating[]
+  matchesWhite  Match[]  @relation("WhitePlayer")
+  matchesBlack  Match[]  @relation("BlackPlayer")
+  sessions      Session[]
+
+  @@index([createdAt])
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @db.Uuid
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // sha256 of JWT jti — allows revocation
+  userAgent String?
+  ipHash    String?  // hashed for privacy
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  @@index([userId, expiresAt])
+}
+
+// ─────────────────────────── WALLET ───────────────────────────
+// One wallet per user. Address is deterministically derived server-side
+// from WALLET_MASTER_SECRET + userId. The privateKey is NEVER stored —
+// it is re-derived in memory whenever the api/worker needs to sign.
+// We store address + derivation metadata so we can audit/rotate later.
+
+model Wallet {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String   @unique @db.Uuid
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  address             String   @unique // 0x-prefixed GenLayer address
+  derivationVersion   String   // matches WALLET_DERIVATION_VERSION at signup time
+  createdAt           DateTime @default(now())
+
+  @@index([address])
+}
+
+// ─────────────────────────── RATING ───────────────────────────
+// Separate Elo per time control. Glicko-2 can replace Elo later
+// without schema changes — extra fields go into `metadata` JSON.
+
+enum TimeControlCategory {
+  BULLET
+  BLITZ
+  RAPID
+  CLASSICAL
+}
+
+model Rating {
+  id            String              @id @default(uuid()) @db.Uuid
+  userId        String              @db.Uuid
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      TimeControlCategory
+  rating        Int                 @default(1500)
+  ratingDev     Int                 @default(350)   // RD for glicko, unused for plain Elo
+  gamesPlayed   Int                 @default(0)
+  updatedAt     DateTime            @updatedAt
+
+  @@unique([userId, category])
+  @@index([category, rating])
+}
+
+// ─────────────────────────── MATCH & MOVES ───────────────────────────
+
+enum MatchStatus {
+  PENDING      // matchmaking found pair, awaiting both clients
+  ACTIVE
+  WHITE_WON
+  BLACK_WON
+  DRAW
+  ABORTED
+}
+
+enum MatchResultReason {
+  CHECKMATE
+  RESIGNATION
+  TIMEOUT
+  STALEMATE
+  THREEFOLD_REPETITION
+  FIFTY_MOVE_RULE
+  INSUFFICIENT_MATERIAL
+  AGREEMENT
+  ABANDONMENT
+}
+
+model Match {
+  id              String              @id @default(uuid()) @db.Uuid
+  whitePlayerId   String              @db.Uuid
+  blackPlayerId   String              @db.Uuid
+  whitePlayer     User                @relation("WhitePlayer", fields: [whitePlayerId], references: [id])
+  blackPlayer     User                @relation("BlackPlayer", fields: [blackPlayerId], references: [id])
+
+  category        TimeControlCategory
+  initialTimeSec  Int                 // base time per side
+  incrementSec    Int                 // Fischer increment
+
+  status          MatchStatus         @default(PENDING)
+  resultReason    MatchResultReason?
+
+  // Final position FEN (for quick rendering of completed games)
+  finalFen        String?
+  // PGN snapshot at completion
+  pgn             String?
+
+  // Elo deltas applied at end of game
+  whiteRatingBefore Int?
+  blackRatingBefore Int?
+  whiteRatingAfter  Int?
+  blackRatingAfter  Int?
+
+  // GenLayer onchain tracking
+  onchainMatchId    String?           // id returned by MatchRegistry contract
+  onchainTxHash     String?
+  onchainSettledAt  DateTime?
+
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime            @default(now())
+
+  moves           Move[]
+  analysis        AnalysisReport?
+
+  @@index([status, createdAt])
+  @@index([whitePlayerId])
+  @@index([blackPlayerId])
+}
+
+model Move {
+  id            String   @id @default(uuid()) @db.Uuid
+  matchId       String   @db.Uuid
+  match         Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ply           Int      // 1-indexed half-move number
+  san           String   // e.g. "Nf3"
+  uci           String   // e.g. "g1f3"
+  fenAfter      String   // FEN after this move
+  clockMsWhite  Int      // remaining time after move
+  clockMsBlack  Int
+  thinkMs       Int      // time spent on this move
+  createdAt     DateTime @default(now())
+
+  // Onchain (batched submission — set when the batch is mined)
+  onchainBatchId String?
+  onchainTxHash  String?
+
+  @@unique([matchId, ply])
+  @@index([matchId, ply])
+}
+
+// ─────────────────────────── AI ANALYSIS ───────────────────────────
+
+model AnalysisReport {
+  id              String   @id @default(uuid()) @db.Uuid
+  matchId         String   @unique @db.Uuid
+  match           Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  // Stockfish output (per-ply eval, blunders, best moves)
+  engineReport    Json
+  // GenLayer LLM natural-language coaching
+  llmSummary      String
+  llmReport       Json
+  // "What if I played X?" sims live here
+  alternatives    Json     @default("[]")
+
+  generatedAt     DateTime @default(now())
+}
