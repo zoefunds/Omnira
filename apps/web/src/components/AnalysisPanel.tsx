@@ -96,7 +96,16 @@ export function AnalysisPanel() {
 
   // Poll the API until report is available (after game ends).
   // Keep polling until BOTH engine analysis AND LLM coaching are present.
-  const llmReady = !!(report?.llmReport?.summary || report?.llmReport?.raw || report?.llmSummary);
+  const llmReady = !!(
+    report?.llmReport && (
+      report.llmReport.summary ||
+      report.llmReport.raw ||
+      report.llmReport.opening ||
+      report.llmReport.themes ||
+      report.llmReport.turning_points ||
+      report.llmSummary
+    )
+  );
   useEffect(() => {
     if (!matchId || !ended) return;
     if (report && llmReady) return;
