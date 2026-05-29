@@ -163,7 +163,7 @@ export async function playMove(
   });
 
   if (result.gameOver) {
-    await finalize(room, result.gameOver, now);
+    await finalize(room, result.gameOver, now, color);
   }
 
   return {
@@ -184,7 +184,7 @@ export async function resign(room: MatchRoom, userId: string, now: number = Date
   const color = colorForUser(room, userId);
   if (!color) return;
   const winner = color === 'w' ? 'BLACK_WON' : 'WHITE_WON';
-  await finalize(room, { outcome: winner, reason: 'RESIGNATION' }, now);
+  await finalize(room, { outcome: winner, reason: 'RESIGNATION' }, now, color);
 }
 
 export async function offerDraw(room: MatchRoom, userId: string) {
@@ -199,15 +199,16 @@ export async function acceptDraw(room: MatchRoom, userId: string, now: number = 
   const color = colorForUser(room, userId);
   if (!color) return;
   if (!room.drawOfferFrom || room.drawOfferFrom === color) return;
-  await finalize(room, { outcome: 'DRAW', reason: 'AGREEMENT' }, now);
+  await finalize(room, { outcome: 'DRAW', reason: 'AGREEMENT' }, now, color);
 }
 
 async function finalizeOnTimeout(room: MatchRoom, flagged: Color, now: number) {
   const outcome = flagged === 'w' ? 'BLACK_WON' : 'WHITE_WON';
-  await finalize(room, { outcome, reason: 'TIMEOUT' }, now);
+  const trigger: Color = flagged === 'w' ? 'b' : 'w';
+  await finalize(room, { outcome, reason: 'TIMEOUT' }, now, trigger);
 }
 
-async function finalize(room: MatchRoom, gameOver: GameOverState, now: number) {
+async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, triggeredBy: Color) {
   if (room.ended) return;
   room.ended = true;
   room.clock = stopClock(room.clock, now);
@@ -230,8 +231,10 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number) {
 
   await updateRating({ userId: room.whitePlayerId, category: room.tc.category, newRating: elo.whiteAfter });
   await updateRating({ userId: room.blackPlayerId, category: room.tc.category, newRating: elo.blackAfter });
+  const signerUserId = triggeredBy === 'w' ? room.whitePlayerId : room.blackPlayerId;
   void enqueueFinalize({
     matchId: room.id,
+    signerUserId,
     status: gameOver.outcome as 'WHITE_WON' | 'BLACK_WON' | 'DRAW' | 'ABORTED',
     resultReason: gameOver.reason,
     finalFen: room.game.fen(),

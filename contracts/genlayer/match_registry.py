@@ -1,11 +1,13 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """
-Omnira — MatchRegistry v3.
+Omnira — MatchRegistry v4.
 
-Removes the separate `registrar` lock; writes are authorized iff the caller's
-address is one of the match's players (white_address or black_address).
-register_match is additionally restricted to the white side, so the first
-onchain action of a game is signed by the player who plays white.
+Per-color move batches:
+- White-only batches: odd plies (1, 3, 5, …), signed by white_address.
+- Black-only batches: even plies (2, 4, 6, …), signed by black_address.
+
+This makes every move's tx sender the moving player's wallet — the
+chain record of who-did-what now matches reality move by move.
 """
 
 from genlayer import *
@@ -26,7 +28,8 @@ class MatchRecord:
     result_reason: str
     final_fen: str
     pgn: str
-    move_count: u256
+    white_move_count: u256
+    black_move_count: u256
 
 
 @allow_storage
@@ -88,7 +91,8 @@ class MatchRegistry(gl.Contract):
             result_reason="",
             final_fen="",
             pgn="",
-            move_count=u256(0),
+            white_move_count=u256(0),
+            black_move_count=u256(0),
         )
 
     @gl.public.write
@@ -106,17 +110,36 @@ class MatchRegistry(gl.Contract):
         rec = self._require_player(match_id)
         if rec.status != "ACTIVE":
             raise Exception(f"match not active: {rec.status}")
+
         n = len(plies)
+        if n == 0:
+            raise Exception("empty batch")
         if not (n == len(sans) == len(ucis) == len(fens_after)
                 == len(clocks_ms_white) == len(clocks_ms_black) == len(think_mss)):
             raise Exception("batch arrays must be the same length")
+
+        sender = gl.message.sender_address
+        is_white = sender == rec.white_address
+        # Required ply parity: white=odd, black=even
+        # Expected sequence: white -> 2*white_count+1, 2*white_count+3, ...
+        #                    black -> 2*black_count+2, 2*black_count+4, ...
+        if is_white:
+            expected = int(rec.white_move_count) * 2 + 1
+        else:
+            expected = int(rec.black_move_count) * 2 + 2
+
         now = self._now()
-        expected = int(rec.move_count) + 1
         i = 0
         while i < n:
-            if int(plies[i]) != expected:
-                raise Exception(f"out-of-order ply: expected {expected}, got {int(plies[i])}")
-            self.moves[self._move_key(match_id, expected)] = MoveRecord(
+            p = int(plies[i])
+            if is_white and (p % 2) != 1:
+                raise Exception(f"white may only submit odd plies, got {p}")
+            if (not is_white) and (p % 2) != 0:
+                raise Exception(f"black may only submit even plies, got {p}")
+            if p != expected:
+                raise Exception(f"out-of-order ply for color: expected {expected}, got {p}")
+
+            self.moves[self._move_key(match_id, p)] = MoveRecord(
                 ply=plies[i],
                 san=sans[i],
                 uci=ucis[i],
@@ -126,9 +149,13 @@ class MatchRegistry(gl.Contract):
                 think_ms=think_mss[i],
                 submitted_at=now,
             )
-            expected += 1
+            expected += 2  # next same-color ply
             i += 1
-        rec.move_count = u256(expected - 1)
+
+        if is_white:
+            rec.white_move_count = u256(int(rec.white_move_count) + n)
+        else:
+            rec.black_move_count = u256(int(rec.black_move_count) + n)
         self.matches[match_id] = rec
 
     @gl.public.write
@@ -152,6 +179,8 @@ class MatchRegistry(gl.Contract):
         rec.ended_at = self._now()
         self.matches[match_id] = rec
 
+    # ── views ─────────────────────────────────────────────────────────
+
     @gl.public.view
     def match_exists(self, match_id: str) -> bool:
         return match_id in self.matches
@@ -163,10 +192,23 @@ class MatchRegistry(gl.Contract):
         return self.matches[match_id]
 
     @gl.public.view
-    def get_move_count(self, match_id: str) -> u256:
+    def get_white_move_count(self, match_id: str) -> u256:
         if match_id not in self.matches:
             raise Exception(f"unknown match: {match_id}")
-        return self.matches[match_id].move_count
+        return self.matches[match_id].white_move_count
+
+    @gl.public.view
+    def get_black_move_count(self, match_id: str) -> u256:
+        if match_id not in self.matches:
+            raise Exception(f"unknown match: {match_id}")
+        return self.matches[match_id].black_move_count
+
+    @gl.public.view
+    def get_total_move_count(self, match_id: str) -> u256:
+        if match_id not in self.matches:
+            raise Exception(f"unknown match: {match_id}")
+        rec = self.matches[match_id]
+        return u256(int(rec.white_move_count) + int(rec.black_move_count))
 
     @gl.public.view
     def get_move(self, match_id: str, ply: u256) -> MoveRecord:

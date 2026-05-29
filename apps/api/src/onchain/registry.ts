@@ -1,5 +1,5 @@
 import { TransactionStatus, CalldataAddress } from 'genlayer-js/types';
-import { onchain, registryAddress, serviceAccount } from './client.js';
+import { onchain, registryAddress } from './client.js';
 import { clientForUser } from './clientForUser.js';
 
 function addr(hex: string): CalldataAddress {
@@ -10,7 +10,7 @@ function addr(hex: string): CalldataAddress {
   return new CalldataAddress(bytes);
 }
 
-async function writeAndWaitWith(
+async function writeAndWait(
   client: ReturnType<typeof onchain>,
   args: Parameters<ReturnType<typeof onchain>['writeContract']>[0],
 ): Promise<`0x${string}`> {
@@ -21,7 +21,7 @@ async function writeAndWaitWith(
 
 export interface RegisterMatchInput {
   matchId: string;
-  whitePlayerId: string;     // signs the tx
+  whitePlayerId: string;          // signs (must equal white)
   whiteAddress: `0x${string}`;
   blackAddress: `0x${string}`;
   initialMs: number;
@@ -30,7 +30,7 @@ export interface RegisterMatchInput {
 
 export async function registerMatchOnchain(input: RegisterMatchInput): Promise<`0x${string}`> {
   const { client, account } = await clientForUser(input.whitePlayerId);
-  return writeAndWaitWith(client, {
+  return writeAndWait(client, {
     account,
     address: registryAddress(),
     functionName: 'register_match',
@@ -54,13 +54,25 @@ export interface MoveBatchEntry {
   thinkMs: number;
 }
 
+/**
+ * Submit a single-color batch.
+ * - `signerUserId` is the player whose color these moves belong to.
+ * - All `batch[i].ply` values must share the same parity (odd=white, even=black).
+ */
 export async function submitMovesBatchOnchain(
   matchId: string,
-  whitePlayerId: string,
+  signerUserId: string,
   batch: MoveBatchEntry[],
 ): Promise<`0x${string}`> {
-  const { client, account } = await clientForUser(whitePlayerId);
-  return writeAndWaitWith(client, {
+  if (batch.length === 0) throw new Error('empty batch');
+  const expectedParity = batch[0]!.ply % 2;
+  for (const m of batch) {
+    if (m.ply % 2 !== expectedParity) {
+      throw new Error('mixed-color batch passed to submitMovesBatchOnchain');
+    }
+  }
+  const { client, account } = await clientForUser(signerUserId);
+  return writeAndWait(client, {
     account,
     address: registryAddress(),
     functionName: 'submit_moves_batch',
@@ -79,7 +91,7 @@ export async function submitMovesBatchOnchain(
 
 export interface FinalizeInput {
   matchId: string;
-  whitePlayerId: string;
+  signerUserId: string;     // whoever triggered the end (resigner / mover delivering mate / accepter)
   status: 'WHITE_WON' | 'BLACK_WON' | 'DRAW' | 'ABORTED';
   resultReason: string;
   finalFen: string;
@@ -87,8 +99,8 @@ export interface FinalizeInput {
 }
 
 export async function finalizeMatchOnchain(input: FinalizeInput): Promise<`0x${string}`> {
-  const { client, account } = await clientForUser(input.whitePlayerId);
-  return writeAndWaitWith(client, {
+  const { client, account } = await clientForUser(input.signerUserId);
+  return writeAndWait(client, {
     account,
     address: registryAddress(),
     functionName: 'finalize_match',
@@ -96,25 +108,11 @@ export async function finalizeMatchOnchain(input: FinalizeInput): Promise<`0x${s
   });
 }
 
-// ── reads remain via the service client (cheaper, no signing) ──
-
+// ── reads via the service client (cheap, no signing) ──
 export async function matchExistsOnchain(matchId: string): Promise<boolean> {
-  const c = onchain();
-  return Boolean(await c.readContract({
+  return Boolean(await onchain().readContract({
     address: registryAddress(),
     functionName: 'match_exists',
     args: [matchId],
   }));
 }
-
-export async function getMoveCountOnchain(matchId: string): Promise<number> {
-  const c = onchain();
-  return Number(await c.readContract({
-    address: registryAddress(),
-    functionName: 'get_move_count',
-    args: [matchId],
-  }));
-}
-
-// Keep serviceAccount export usable elsewhere (e.g., funding)
-export { serviceAccount };
