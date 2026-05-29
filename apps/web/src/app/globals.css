@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #efece4;
+  --foreground: #1a1a1a;
+}
+
+html, body {
+  background: var(--background);
+  color: var(--foreground);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Subtle paper texture overlay — pure CSS, no asset */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(rgba(0,0,0,0.015) 1px, transparent 1px) 0 0 / 3px 3px;
+  z-index: 0;
+}
