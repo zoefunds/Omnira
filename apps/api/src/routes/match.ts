@@ -3,7 +3,7 @@ import { prisma } from '@omnira/db';
 import { env } from '../config/env.js';
 
 export async function registerMatchRoutes(app: FastifyInstance) {
-  app.get('/match/:id/onchain', async (req, reply) => {
+  app.get('/match/:id/onchain', { config: { rateLimit: false } }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const m = await prisma.match.findUnique({
       where: { id },

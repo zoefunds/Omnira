@@ -9,6 +9,7 @@ import { registerMatchRoutes } from './routes/match.js';
 import { registerChallengeRoutes } from './routes/challenges.js';
 import { registerChatRoutes } from './routes/chat.js';
 import { registerAnalysisRoutes } from './routes/analysis.js';
+import { registerAlternativeRoutes } from './routes/alternatives.js';
 import { attachRealtime } from './realtime/socket.js';
 
 export async function buildServer() {
@@ -19,7 +20,7 @@ export async function buildServer() {
 
   await app.register(sensible);
   await app.register(cors, { origin: true, credentials: true });
-  await app.register(rateLimit, { max: 100, timeWindow: '1 minute' });
+  await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });
   await app.register(jwt, { secret: cfg.JWT_SECRET });
 
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
@@ -29,6 +30,7 @@ export async function buildServer() {
   await registerChallengeRoutes(app);
   await registerChatRoutes(app);
   await registerAnalysisRoutes(app);
+  await registerAlternativeRoutes(app);
 
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();

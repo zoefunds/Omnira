@@ -2,15 +2,25 @@ import { prisma } from '@omnira/db';
 import { Stockfish } from '@omnira/chess-engine';
 import { env } from './env.js';
 import { analyzeOne, workerLog, workerErr } from './analyzeOne.js';
+import { processAlternative, findNextAlternative } from './processAlternative.js';
 
 async function findNext(): Promise<string | null> {
-  // Matches that have ended, have a PGN, and don't yet have an AnalysisReport.
+  // Matches that have ended, have a PGN, and either lack an AnalysisReport
+  // OR have one with an empty llmSummary that's older than 10 minutes (retry stuck rows).
+  const tenMinAgo = new Date(Date.now() - 10 * 60_000);
   const m = await prisma.match.findFirst({
     where: {
       endedAt: { not: null },
       pgn: { not: null },
-      analysis: { is: null },
       status: { in: ['WHITE_WON', 'BLACK_WON', 'DRAW'] },
+      OR: [
+        { analysis: { is: null } },
+        {
+          analysis: {
+            is: { llmSummary: '', generatedAt: { lt: tenMinAgo } },
+          },
+        },
+      ],
     },
     orderBy: { endedAt: 'asc' },
     select: { id: true },
@@ -40,6 +50,8 @@ async function main() {
 
   while (!shuttingDown) {
     try {
+      const altId = await findNextAlternative();
+      if (altId) { await processAlternative(altId, sf, cfg.ANALYSIS_DEPTH); continue; }
       const id = await findNext();
       if (id) {
         try {

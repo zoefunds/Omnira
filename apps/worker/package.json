@@ -13,6 +13,7 @@
   "dependencies": {
     "@omnira/chess-engine": "workspace:*",
     "@omnira/db": "workspace:*",
+    "chess.js": "^1.0.0-beta.8",
     "genlayer-js": "^1.1.8",
     "zod": "^3.23.8"
   },
