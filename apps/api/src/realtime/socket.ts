@@ -3,6 +3,8 @@ import { Server, type Socket } from 'socket.io';
 import { joinOrMatch, leaveQueue } from '../matchmaking/queue.js';
 import { spawnMatch, getRoom, playMove, resign, offerDraw, acceptDraw } from '../match/runtime.js';
 import { prisma } from '@omnira/db';
+import { acceptChallenge, resolveColors, linkMatch, ChallengeError } from '../lobby/service.js';
+import { postMessage, ChatError } from '../chat/service.js';
 
 interface AuthedSocket extends Socket {
   data: { userId: string };
@@ -155,6 +157,78 @@ export function attachRealtime(app: FastifyInstance): Server {
       });
       ack?.({ ok: true });
     });
+
+    s.on('lobby:subscribe', async (_payload, ack) => {
+      s.join('lobby:public');
+      ack?.({ ok: true });
+    });
+
+    s.on('lobby:unsubscribe', async (_payload, ack) => {
+      s.leave('lobby:public');
+      ack?.({ ok: true });
+    });
+
+    s.on('challenge:accept', async (payload: { code: string }, ack) => {
+      try {
+        const ch = await acceptChallenge(payload.code, userId);
+        const { whitePlayerId, blackPlayerId } = resolveColors(
+          ch.creatorId,
+          ch.acceptedById!,
+          ch.colorPreference,
+        );
+
+        const room = await spawnMatch({
+          whitePlayerId,
+          blackPlayerId,
+          initialMs: ch.initialMs,
+          incrementMs: ch.incrementMs,
+        });
+        await linkMatch(ch.id, room.id);
+
+        const start = {
+          matchId: room.id,
+          whitePlayerId,
+          blackPlayerId,
+          initialMs: ch.initialMs,
+          incrementMs: ch.incrementMs,
+          fen: room.game.fen(),
+          startedAt: Date.now(),
+        };
+        io.to(`user:${whitePlayerId}`).to(`user:${blackPlayerId}`).emit('match:start', start);
+
+        const sockets = await io.fetchSockets();
+        for (const sock of sockets) {
+          const uid = (sock.data as { userId?: string }).userId;
+          if (uid === whitePlayerId || uid === blackPlayerId) sock.join(`match:${room.id}`);
+        }
+
+        io.to('lobby:public').emit('challenge:accepted', { code: ch.code, matchId: room.id });
+        ack?.({ ok: true, matchId: room.id });
+      } catch (e) {
+        if (e instanceof ChallengeError) return ack?.({ ok: false, error: e.code });
+        ack?.({ ok: false, error: 'INTERNAL' });
+      }
+    });
+
+    s.on('chat:send', async (payload: { matchId: string; body: string }, ack) => {
+      try {
+        const msg = await postMessage(payload.matchId, userId, payload.body);
+        io.to(`match:${payload.matchId}`).emit('chat:message', {
+          id: msg.id,
+          matchId: payload.matchId,
+          senderId: msg.senderId,
+          senderUsername: msg.sender.username,
+          body: msg.body,
+          createdAt: msg.createdAt.toISOString(),
+        });
+        ack?.({ ok: true });
+      } catch (e) {
+        if (e instanceof ChatError) return ack?.({ ok: false, error: e.code });
+        ack?.({ ok: false, error: 'INTERNAL' });
+      }
+    });
+
+
   });
 
   return io;
