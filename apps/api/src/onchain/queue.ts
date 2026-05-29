@@ -38,6 +38,7 @@ type Op =
 interface PendingMatch {
   registered: boolean;
   pendingMoves: MoveBatchEntry[];
+  whitePlayerId: string | null;
 }
 
 const pending = new Map<string, PendingMatch>();
@@ -48,7 +49,7 @@ let pumpStarted = false;
 function pmFor(matchId: string): PendingMatch {
   let pm = pending.get(matchId);
   if (!pm) {
-    pm = { registered: false, pendingMoves: [] };
+    pm = { registered: false, pendingMoves: [], whitePlayerId: null };
     pending.set(matchId, pm);
   }
   return pm;
@@ -77,7 +78,7 @@ export async function enqueueRegister(input: {
   incrementMs: number;
 }): Promise<void> {
   if (!onchainEnabled()) return;
-  pmFor(input.matchId);
+  pmFor(input.matchId).whitePlayerId = input.whitePlayerId;
   ops.push({ kind: 'register', ...input });
   ensurePump();
 }
@@ -157,6 +158,7 @@ async function runOp(op: Op): Promise<boolean> {
       logCtx(op.matchId, 'register: sending');
       const tx = await registerMatchOnchain({
         matchId: op.matchId,
+        whitePlayerId: op.whitePlayerId,
         whiteAddress,
         blackAddress,
         initialMs: op.initialMs,
@@ -178,7 +180,9 @@ async function runOp(op: Op): Promise<boolean> {
         return false;
       }
       logCtx(op.matchId, 'batch: sending', { count: op.moves.length });
-      const tx = await submitMovesBatchOnchain(op.matchId, op.moves);
+      const wid = pmFor(op.matchId).whitePlayerId;
+      if (!wid) return false;
+      const tx = await submitMovesBatchOnchain(op.matchId, wid, op.moves);
       const plies = op.moves.map((m) => m.ply);
       await prisma.move.updateMany({
         where: { matchId: op.matchId, ply: { in: plies } },
@@ -194,8 +198,11 @@ async function runOp(op: Op): Promise<boolean> {
         return false;
       }
       logCtx(op.matchId, 'finalize: sending', { status: op.status });
+      const wid = pmFor(op.matchId).whitePlayerId;
+      if (!wid) return false;
       const tx = await finalizeMatchOnchain({
         matchId: op.matchId,
+        whitePlayerId: wid,
         status: op.status,
         resultReason: op.resultReason,
         finalFen: op.finalFen,

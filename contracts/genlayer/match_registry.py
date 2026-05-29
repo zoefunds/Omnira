@@ -1,11 +1,11 @@
 # { "Depends": "py-genlayer:1jb45aa8ynh2a9c9xn3b7qqh8sm5q93hwfp7jqmwsfhh8jpz09h6" }
 """
-Omnira — MatchRegistry Intelligent Contract.
+Omnira — MatchRegistry v3.
 
-Stores matches and their moves onchain. Moves are stored as a flat
-TreeMap keyed by "{match_id}|{ply}" instead of nested DynArray, because
-GenLayer storage forbids user-instantiating DynArray. The MatchRecord's
-move_count tells you how many keys exist (1..move_count).
+Removes the separate `registrar` lock; writes are authorized iff the caller's
+address is one of the match's players (white_address or black_address).
+register_match is additionally restricted to the white side, so the first
+onchain action of a game is signed by the player who plays white.
 """
 
 from genlayer import *
@@ -18,13 +18,12 @@ from datetime import datetime, timezone
 class MatchRecord:
     white_address: Address
     black_address: Address
-    registrar: Address
     initial_ms: u256
     increment_ms: u256
     started_at: u256
     ended_at: u256
-    status: str           # "ACTIVE" | "WHITE_WON" | "BLACK_WON" | "DRAW" | "ABORTED"
-    result_reason: str    # "" while ACTIVE
+    status: str
+    result_reason: str
     final_fen: str
     pgn: str
     move_count: u256
@@ -50,23 +49,20 @@ class MatchRegistry(gl.Contract):
     def __init__(self):
         pass
 
-    # ── helpers ──────────────────────────────────────────────────────
-
     def _now(self) -> u256:
         return u256(int(datetime.now(timezone.utc).timestamp()))
-
-    def _require_registrar(self, match_id: str) -> MatchRecord:
-        if match_id not in self.matches:
-            raise Exception(f"unknown match: {match_id}")
-        rec = self.matches[match_id]
-        if gl.message.sender_address != rec.registrar:
-            raise Exception("only the original registrar may modify this match")
-        return rec
 
     def _move_key(self, match_id: str, ply: int) -> str:
         return f"{match_id}|{ply}"
 
-    # ── writes ───────────────────────────────────────────────────────
+    def _require_player(self, match_id: str) -> MatchRecord:
+        if match_id not in self.matches:
+            raise Exception(f"unknown match: {match_id}")
+        rec = self.matches[match_id]
+        sender = gl.message.sender_address
+        if sender != rec.white_address and sender != rec.black_address:
+            raise Exception("only match players may modify this match")
+        return rec
 
     @gl.public.write
     def register_match(
@@ -79,10 +75,11 @@ class MatchRegistry(gl.Contract):
     ) -> None:
         if match_id in self.matches:
             raise Exception(f"match already registered: {match_id}")
+        if gl.message.sender_address != white_address:
+            raise Exception("register_match must be signed by the white player")
         self.matches[match_id] = MatchRecord(
             white_address=white_address,
             black_address=black_address,
-            registrar=gl.message.sender_address,
             initial_ms=initial_ms,
             increment_ms=increment_ms,
             started_at=self._now(),
@@ -106,15 +103,13 @@ class MatchRegistry(gl.Contract):
         clocks_ms_black: DynArray[u256],
         think_mss:       DynArray[u256],
     ) -> None:
-        rec = self._require_registrar(match_id)
+        rec = self._require_player(match_id)
         if rec.status != "ACTIVE":
             raise Exception(f"match not active: {rec.status}")
-
         n = len(plies)
         if not (n == len(sans) == len(ucis) == len(fens_after)
                 == len(clocks_ms_white) == len(clocks_ms_black) == len(think_mss)):
             raise Exception("batch arrays must be the same length")
-
         now = self._now()
         expected = int(rec.move_count) + 1
         i = 0
@@ -133,7 +128,6 @@ class MatchRegistry(gl.Contract):
             )
             expected += 1
             i += 1
-
         rec.move_count = u256(expected - 1)
         self.matches[match_id] = rec
 
@@ -146,20 +140,17 @@ class MatchRegistry(gl.Contract):
         final_fen: str,
         pgn: str,
     ) -> None:
-        rec = self._require_registrar(match_id)
+        rec = self._require_player(match_id)
         if rec.status != "ACTIVE":
             raise Exception(f"already finalized: {rec.status}")
         if status not in ("WHITE_WON", "BLACK_WON", "DRAW", "ABORTED"):
             raise Exception(f"invalid status: {status}")
-
         rec.status = status
         rec.result_reason = result_reason
         rec.final_fen = final_fen
         rec.pgn = pgn
         rec.ended_at = self._now()
         self.matches[match_id] = rec
-
-    # ── views ────────────────────────────────────────────────────────
 
     @gl.public.view
     def match_exists(self, match_id: str) -> bool:

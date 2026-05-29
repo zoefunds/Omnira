@@ -1,6 +1,7 @@
 import { prisma, Prisma } from '@omnira/db';
 import { hashPassword, verifyPassword } from './password.js';
 import { deriveWallet } from '../wallet/derive.js';
+import { fundUserWallet } from '../onchain/funding.js';
 
 export class AuthError extends Error {
   constructor(public code: string, message: string, public status = 400) {
@@ -89,6 +90,8 @@ export async function signup(input: SignupInput): Promise<PublicUser> {
       });
     });
 
+    // fire-and-forget: fund player wallet so they can sign their own onchain txs
+    if (user.wallet?.address) void fundUserWallet(user.wallet.address as `0x${string}`);
     return toPublic(user);
   } catch (e) {
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

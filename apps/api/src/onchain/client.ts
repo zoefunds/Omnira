@@ -24,3 +24,5 @@ export function serviceAccount() {
 export function registryAddress(): `0x${string}` {
   return env().GENLAYER_MATCH_REGISTRY_ADDRESS as `0x${string}`;
 }
+
+export { onchainEnabled } from '../config/env.js';
