@@ -9,6 +9,7 @@ import { useAuth } from '@/store/auth';
 import { Clock } from './Clock';
 import { MatchSidebar } from './MatchSidebar';
 import { Button } from './Button';
+import { OnchainBadge } from './OnchainBadge';
 
 const Chessboard = dynamic(() => import('react-chessboard').then((m) => m.Chessboard), {
   ssr: false,
@@ -152,6 +153,7 @@ export function MatchView({ socket }: Props) {
         <div className="mt-3">{myClock}</div>
 
         {m.ended && <EndOverlay />}
+        <div className="mt-4"><OnchainBadge /></div>
       </div>
       <MatchSidebar socket={socket} />
     </div>

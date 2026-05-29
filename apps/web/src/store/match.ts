@@ -26,6 +26,7 @@ export interface MatchState {
   ended: null | { outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW'; reason: string };
   drawOfferFrom: Color | null;
   queueStatus: 'idle' | 'waiting' | 'matched';
+  chain: { matchTx: string | null; settledAt: string | null } | null;
 
   setQueueStatus: (s: MatchState['queueStatus']) => void;
   onMatchStart: (p: {
@@ -48,6 +49,7 @@ export interface MatchState {
   }) => void;
   onDrawOffer: (from: Color) => void;
   onMatchEnd: (p: { outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW'; reason: string }) => void;
+  setChain: (c: { matchTx: string | null; settledAt: string | null } | null) => void;
   reset: () => void;
 }
 
@@ -76,6 +78,7 @@ const initial = (): Omit<
   ended: null,
   drawOfferFrom: null,
   queueStatus: 'idle',
+  chain: null,
 });
 
 export const useMatch = create<MatchState>((set) => ({
@@ -110,5 +113,6 @@ export const useMatch = create<MatchState>((set) => ({
     })),
   onDrawOffer: (from) => set({ drawOfferFrom: from }),
   onMatchEnd: (p) => set({ ended: p }),
+  setChain: (c) => set({ chain: c }),
   reset: () => set(initial()),
 }));
