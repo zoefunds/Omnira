@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
-import { Chess } from 'chess.js';
+import { Chess, type Square } from 'chess.js';
 import type { Socket } from 'socket.io-client';
 import { useMatch } from '@/store/match';
 import { useAuth } from '@/store/auth';
@@ -10,7 +10,6 @@ import { Clock } from './Clock';
 import { MatchSidebar } from './MatchSidebar';
 import { Button } from './Button';
 
-// react-chessboard is a client-only component
 const Chessboard = dynamic(() => import('react-chessboard').then((m) => m.Chessboard), {
   ssr: false,
 });
@@ -22,39 +21,104 @@ interface Props {
 export function MatchView({ socket }: Props) {
   const m = useMatch();
   const user = useAuth((s) => s.user);
+  const [selected, setSelected] = useState<Square | null>(null);
 
   const chess = useMemo(() => new Chess(m.fen), [m.fen]);
 
+  // Reset selection whenever the position changes (move played, new game, etc).
+  // Using fen as a key effectively does this.
   if (!m.matchId || !m.myColor || !user) return null;
 
   const boardOrientation = m.myColor === 'w' ? 'white' : 'black';
   const myTurn = chess.turn() === m.myColor && !m.ended;
 
-  function onPieceDrop(source: string, target: string, piece: string): boolean {
-    if (!myTurn) return false;
-    const isPromotion =
-      (piece[1] === 'P' && target[1] === '8') || (piece[1] === 'P' && target[1] === '1');
-    const uci = `${source}${target}${isPromotion ? 'q' : ''}`;
+  // Legal target squares from the currently selected square.
+  const legalTargets: Set<string> = useMemo(() => {
+    if (!selected) return new Set();
+    const moves = chess.moves({ square: selected, verbose: true }) as Array<{ to: string }>;
+    return new Set(moves.map((mv) => mv.to));
+  }, [selected, chess]);
 
-    // optimistic legality check (server still authoritative)
-    const trial = new Chess(m.fen);
-    let ok = false;
-    try {
-      const r = trial.move({ from: source, to: target, promotion: isPromotion ? 'q' : undefined });
-      ok = !!r;
-    } catch {
-      ok = false;
-    }
-    if (!ok) return false;
+  function isMyPieceOn(square: Square): boolean {
+    const piece = chess.get(square);
+    return !!piece && piece.color === m.myColor;
+  }
 
-    socket.emit('match:move', { matchId: m.matchId, uci }, (ack: { ok: boolean; error?: string }) => {
-      if (!ack.ok) {
-        // server rejected — the next match:move event for our optimistic UI never fires,
-        // but our snapshot will be corrected by future authoritative state.
-        console.warn('move rejected', ack.error);
+  function sendMove(from: Square, to: Square, isPromotion: boolean) {
+    const uci = `${from}${to}${isPromotion ? 'q' : ''}`;
+    socket.emit(
+      'match:move',
+      { matchId: m.matchId, uci },
+      (ack: { ok: boolean; error?: string }) => {
+        if (!ack.ok) console.warn('move rejected', ack.error);
+      },
+    );
+  }
+
+  const onSquareClick = useCallback(
+    (square: Square) => {
+      if (!myTurn) {
+        setSelected(null);
+        return;
       }
-    });
-    return true;
+
+      // 1) Nothing selected yet → select if it's my piece, else ignore.
+      if (!selected) {
+        if (isMyPieceOn(square)) setSelected(square);
+        return;
+      }
+
+      // 2) Clicking the same square again → deselect.
+      if (selected === square) {
+        setSelected(null);
+        return;
+      }
+
+      // 3) Clicking another of my pieces → reselect.
+      if (isMyPieceOn(square)) {
+        setSelected(square);
+        return;
+      }
+
+      // 4) Clicking a legal destination → try the move.
+      if (legalTargets.has(square)) {
+        const moving = chess.get(selected);
+        const isPromotion =
+          !!moving &&
+          moving.type === 'p' &&
+          ((moving.color === 'w' && square[1] === '8') ||
+            (moving.color === 'b' && square[1] === '1'));
+        sendMove(selected, square, isPromotion);
+        setSelected(null);
+        return;
+      }
+
+      // 5) Clicked an empty / opponent square that isn't a legal target → just deselect.
+      setSelected(null);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selected, myTurn, chess, legalTargets, m.matchId],
+  );
+
+  // Build customSquareStyles for the selected square + its legal targets.
+  const squareStyles: Record<string, React.CSSProperties> = {};
+  if (selected) {
+    squareStyles[selected] = {
+      background: 'rgba(47, 107, 79, 0.35)', // accent-green tint
+    };
+    for (const t of legalTargets) {
+      const occupied = !!chess.get(t as Square);
+      squareStyles[t] = occupied
+        ? {
+            // ring on capturable squares
+            boxShadow: 'inset 0 0 0 4px rgba(161, 58, 46, 0.55)',
+          }
+        : {
+            // dot on empty squares
+            background:
+              'radial-gradient(circle, rgba(47,107,79,0.45) 18%, transparent 22%)',
+          };
+    }
   }
 
   const whiteTicking = !m.ended && m.turn === 'w';
@@ -77,8 +141,9 @@ export function MatchView({ socket }: Props) {
           <Chessboard
             position={m.fen}
             boardOrientation={boardOrientation}
-            onPieceDrop={onPieceDrop}
-            arePiecesDraggable={myTurn}
+            arePiecesDraggable={false}
+            onSquareClick={onSquareClick}
+            customSquareStyles={squareStyles}
             customBoardStyle={{ borderRadius: '0.875rem' }}
             customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
             customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
@@ -106,7 +171,9 @@ function EndOverlay() {
   return (
     <div className="mt-6 rounded-xl border border-parchment-300 bg-parchment-50 p-5 max-w-md">
       <div className="font-serif text-2xl text-ink-900">{title}</div>
-      <div className="mt-1 text-sm text-ink-600">{ended.reason.replace(/_/g, ' ').toLowerCase()}</div>
+      <div className="mt-1 text-sm text-ink-600">
+        {ended.reason.replace(/_/g, ' ').toLowerCase()}
+      </div>
       <Button className="mt-4" onClick={reset}>
         New game
       </Button>
