@@ -5,6 +5,7 @@ import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
 import { env } from './config/env.js';
 import { registerAuthRoutes } from './routes/auth.js';
+import { attachRealtime } from './realtime/socket.js';
 
 export async function buildServer() {
   const cfg = env();
@@ -21,10 +22,16 @@ export async function buildServer() {
 
   await registerAuthRoutes(app);
 
+  // Force fastify to instantiate the underlying http server before we attach socket.io
+  await app.ready();
+  const io = attachRealtime(app);
+
+  // Expose for shutdown
+  (app as unknown as { io: typeof io }).io = io;
+
   return app;
 }
 
-// Only auto-start when run directly (not when imported by tests).
 const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const cfg = env();
