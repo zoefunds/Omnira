@@ -5,6 +5,9 @@ import { clsx } from 'clsx';
 import { API_BASE } from '@/lib/config';
 import { useMatch } from '@/store/match';
 import { useAnalysis, type MoveClass, type PerMove, type EngineReport } from '@/store/analysis';
+import { useAlternatives, type ApiAlternative } from '@/store/alternatives';
+
+const ALT_EMPTY: ApiAlternative[] = [];
 import { CoachNotes } from './CoachNotes';
 
 const DOT: Record<MoveClass, string> = {
@@ -124,6 +127,26 @@ export function AnalysisPanel() {
     return () => { stopped = true; };
   }, [matchId, ended, report, llmReady, setReport]);
 
+
+  const alts = useAlternatives((s) => (matchId ? s.byMatch[matchId] ?? ALT_EMPTY : ALT_EMPTY));
+  const setAlts = useAlternatives((s) => s.setAll);
+  useEffect(() => {
+    if (!matchId || !ended) return;
+    let stopped = false;
+    const fetchAlts = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/match/${matchId}/alternatives`);
+        if (res.ok) {
+          const j = await res.json();
+          if (!stopped) setAlts(matchId, j.alternatives ?? []);
+        }
+      } catch {/* ignore */}
+    };
+    void fetchAlts();
+    const id = setInterval(fetchAlts, 3000);
+    return () => { stopped = true; clearInterval(id); };
+  }, [matchId, ended, setAlts]);
+
   if (!matchId) return null;
 
   if (!ended) {
@@ -155,7 +178,7 @@ export function AnalysisPanel() {
   return (
     <div className="flex flex-col gap-4 max-h-[36rem] overflow-y-auto pr-1">
       {report.llmReport && (
-        <CoachNotes report={report.llmReport} summary={report.llmSummary || null} />
+        <CoachNotes report={report.llmReport} summary={report.llmSummary || null} fenByPly={Object.fromEntries((eng.perMove ?? []).map((m) => [m.ply, m.fenBefore]))} />
       )}
       {!llmReady && (
         <div className="flex items-center gap-2 text-xs text-ink-400">

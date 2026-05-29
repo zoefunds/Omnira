@@ -1,6 +1,13 @@
 'use client';
 
+import { useState } from 'react';
 import type { LlmReport, PhaseAssessment, TurningPoint } from '@/store/analysis';
+import { useAlternatives, type ApiAlternative } from '@/store/alternatives';
+
+const ALT_EMPTY: ApiAlternative[] = [];
+import { AlternativeForm } from './AlternativeForm';
+import { AlternativeResult } from './AlternativeResult';
+import { useMatch } from '@/store/match';
 
 function PhaseCard({
   title,
@@ -36,8 +43,12 @@ function PhaseCard({
   );
 }
 
-function TurningPointCard({ tp }: { tp: TurningPoint }) {
+function TurningPointCard({ tp, fenBefore }: { tp: TurningPoint; fenBefore: string }) {
   const whiteMove = tp.ply % 2 === 1;
+  const [open, setOpen] = useState(false);
+  const matchId = useMatch((s) => s.matchId);
+  const alts = useAlternatives((s) => (matchId ? s.byMatch[matchId] ?? ALT_EMPTY : ALT_EMPTY))
+    .filter((a) => a.ply === tp.ply);
   return (
     <div className="rounded-xl border border-parchment-300 bg-parchment-50 p-3">
       <div className="flex items-baseline gap-2">
@@ -56,6 +67,27 @@ function TurningPointCard({ tp }: { tp: TurningPoint }) {
         <span className="text-accent">{tp.best_san}</span>
       </div>
       <p className="text-sm text-ink-900 mt-1.5 leading-snug">{tp.what_happened}</p>
+
+      {matchId && !open && (
+        <button
+          onClick={() => setOpen(true)}
+          className="mt-2 text-xs text-accent hover:underline"
+        >
+          Try a different move →
+        </button>
+      )}
+      {matchId && open && (
+        <AlternativeForm
+          matchId={matchId}
+          ply={tp.ply}
+          fenBefore={fenBefore}
+          playedSan={tp.san}
+          onClose={() => setOpen(false)}
+        />
+      )}
+      {alts.map((a) => (
+        <AlternativeResult key={a.id} alt={a} />
+      ))}
     </div>
   );
 }
@@ -96,7 +128,7 @@ function AdviceCards({ advice }: { advice: { white?: string; black?: string } | 
   );
 }
 
-export function CoachNotes({ report, summary }: { report: LlmReport; summary: string | null }) {
+export function CoachNotes({ report, summary, fenByPly }: { report: LlmReport; summary: string | null; fenByPly: Record<number, string> }) {
   // If the model gave us nothing parseable, fall back to raw text.
   const hasStructured = !!(report.summary || report.opening || report.middlegame || report.turning_points || report.advice);
   if (!hasStructured && !summary && !report.raw) return null;
@@ -123,7 +155,7 @@ export function CoachNotes({ report, summary }: { report: LlmReport; summary: st
       {report.turning_points && report.turning_points.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="text-[10px] uppercase tracking-wider text-ink-400">Turning points</div>
-          {report.turning_points.map((tp, i) => <TurningPointCard key={`${tp.ply}-${i}`} tp={tp} />)}
+          {report.turning_points.map((tp, i) => <TurningPointCard key={`${tp.ply}-${i}`} tp={tp} fenBefore={fenByPly[tp.ply] ?? ''} />)}
         </div>
       )}
 
