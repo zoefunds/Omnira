@@ -68,12 +68,12 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
 
     // Quality gate — keep only puzzles where the answer is clearly forced:
     //   - mate-in-1 (always great)
-    //   - cpLoss >= 250 (huge blunder, almost always a clean tactic)
+    //   - cpLoss >= 200 (huge blunder, almost always a clean tactic)
     //   - cpLoss >= 150 AND solution is forcing (check or capture)
     const keep =
       isMate ||
-      cpLoss >= 250 ||
-      (cpLoss >= 150 && (isCheck || isCapture));
+      cpLoss >= 200 ||
+      (cpLoss >= 100 && (isCheck || isCapture));
     if (!keep) continue;
 
     const sideToMove = m.fenBefore.split(' ')[1] === 'b' ? 'b' : 'w';
@@ -116,13 +116,15 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
 
 /** Polling loop: find matches with analysis but no puzzles yet, and generate. */
 export async function findMatchForPuzzleGen(): Promise<string | null> {
+  const t0 = Date.now();
   const m = await prisma.match.findFirst({
     where: {
-      analysis: { is: { NOT: { llmSummary: '' } } },
+      analysis: { is: { llmSummary: { not: '' } } },
       puzzles: { none: {} },
     },
     orderBy: { endedAt: 'desc' },
     select: { id: true },
   });
+  console.log(JSON.stringify({ level: 30, comp: 'worker/puzzles', msg: 'pick', matchId: m?.id ?? null, ms: Date.now() - t0 }));
   return m?.id ?? null;
 }
