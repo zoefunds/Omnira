@@ -10,13 +10,14 @@ import { MatchView } from '@/components/MatchView';
 
 export default function PlayPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const socket = useSocket(token);
   const m = useMatch();
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user || !token) router.replace('/login');
-  }, [user, token, router]);
+  }, [hydrated, user, token, router]);
 
   useEffect(() => {
     if (!socket || !user) return;
@@ -83,6 +84,7 @@ export default function PlayPage() {
 }
 
 function RedirectToLobby() {
-  if (typeof window !== 'undefined') window.location.replace('/lobby');
+  const r = useRouter();
+  useEffect(() => { r.replace('/lobby'); }, [r]);
   return null;
 }

@@ -134,7 +134,7 @@ export function MatchView({ socket }: Props) {
       : <Clock label="You" remainingMs={m.blackMs} tickFrom={m.clockTickFrom} ticking={blackTicking} />;
 
   return (
-    <div className="grid lg:grid-cols-[1fr_auto] gap-6 items-start">
+    <div className="grid lg:grid-cols-[1fr_auto] gap-6 items-start" data-test-mycolor={m.myColor ?? ""}>
       <div className="max-w-[640px] w-full">
         <div className="mb-3">{opponentClock}</div>
         <div className="rounded-xl overflow-hidden shadow-soft">

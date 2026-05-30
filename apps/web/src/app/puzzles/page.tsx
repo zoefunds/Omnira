@@ -14,7 +14,7 @@ type Phase = 'loading' | 'solving' | 'graded' | 'empty';
 
 export default function PuzzlesPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const [puzzle, setPuzzle] = useState<ApiPuzzle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [stats, setStats] = useState<ApiPuzzleStats | null>(null);
@@ -22,7 +22,7 @@ export default function PuzzlesPage() {
   const [graded, setGraded] = useState<ApiPuzzleAttemptResponse | null>(null);
   const [startTs, setStartTs] = useState<number>(Date.now());
 
-  useEffect(() => { if (!user) router.replace('/login'); }, [user, router]);
+  useEffect(() => { if (!hydrated) return; if (!user) router.replace('/login'); }, [hydrated, user, router]);
 
   const loadNext = useCallback(async () => {
     if (!token || !user) return;

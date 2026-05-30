@@ -37,7 +37,7 @@ function StatusPill({ status }: { status: ApiTournament['status'] }) {
 
 export default function TournamentsPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const [list, setList] = useState<ApiTournament[]>([]);
   const [modal, setModal] = useState(false);
 

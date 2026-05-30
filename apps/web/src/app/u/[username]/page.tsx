@@ -29,22 +29,25 @@ export default function ProfilePage() {
   const [history, setHistory] = useState<Record<string, Array<{ at: string; rating: number }>>>({});
   const [tournaments, setTournaments] = useState<ApiProfileTournament[]>([]);
   const [analyses, setAnalyses] = useState<ApiAnalyzedMatch[]>([]);
+  const [puzzleStats, setPuzzleStats] = useState<{ rating: number; solved: number; attempted: number } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [p, m, h, t, a] = await Promise.all([
+        const [p, m, h, t, a, ps] = await Promise.all([
           api.getProfile(username),
           api.getProfileMatches(username),
           api.getProfileRatings(username),
           api.getProfileTournaments(username),
           api.getProfileAnalyses(username),
+          api.getPuzzleStats(username),
         ]);
         if (cancelled) return;
         setProfile(p.profile); setMatches(m.matches); setHistory(h.history);
         setTournaments(t.tournaments); setAnalyses(a.matches);
+        setPuzzleStats(ps.stats ? { rating: ps.stats.rating, solved: ps.stats.solved, attempted: ps.stats.attempted } : null);
       } catch (e) {
         if (!cancelled) setErr((e as Error).message);
       }
@@ -108,6 +111,18 @@ export default function ProfilePage() {
           ))}
         </div>
       </section>
+
+      {/* Puzzle rating */}
+      {puzzleStats && (
+        <section>
+          <h2 className="font-serif text-xl text-ink-900 mb-3">Puzzles</h2>
+          <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-3 max-w-sm">
+            <div className="text-[10px] uppercase tracking-wider text-ink-400">Puzzle rating</div>
+            <div className="mt-1 font-mono text-2xl text-ink-900">{puzzleStats.rating}</div>
+            <div className="mt-1 text-xs text-ink-600">{puzzleStats.solved} solved · {puzzleStats.attempted} attempted</div>
+          </div>
+        </section>
+      )}
 
       {/* Recent games */}
       <section>

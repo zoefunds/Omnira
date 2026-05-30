@@ -19,12 +19,12 @@ export default function TournamentPage() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const [t, setT] = useState<ApiTournament | null>(null);
   const [standings, setStandings] = useState<ApiTournamentPlayer[]>([]);
   const [busy, setBusy] = useState(false);
 
-  useEffect(() => { if (!user) router.replace('/login'); }, [user, router]);
+  useEffect(() => { if (!hydrated) return; if (!user) router.replace('/login'); }, [hydrated, user, router]);
 
   async function refresh() {
     try {

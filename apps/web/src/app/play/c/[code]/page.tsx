@@ -12,7 +12,7 @@ export default function PrivateChallengePage() {
   const router = useRouter();
   const params = useParams<{ code: string }>();
   const code = params.code;
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const socket = useSocket(token);
   const m = useMatch();
   const [challenge, setChallenge] = useState<ApiChallenge | null>(null);

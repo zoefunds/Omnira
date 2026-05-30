@@ -12,14 +12,15 @@ import { Button } from '@/components/Button';
 
 export default function LobbyPage() {
   const router = useRouter();
-  const { user, token } = useAuth();
+  const { user, token, hydrated } = useAuth();
   const socket = useSocket(token);
   const m = useMatch();
   const [modal, setModal] = useState(false);
 
   useEffect(() => {
+    if (!hydrated) return;
     if (!user || !token) router.replace('/login');
-  }, [user, token, router]);
+  }, [hydrated, user, token, router]);
 
   // When a match starts (either via queue or accepting a challenge), go to /play.
   useEffect(() => {
