@@ -44,9 +44,9 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
     where: { matchId },
     select: { engineReport: true },
   });
-  if (!ar) return 0;
+  if (!ar) { triedEmpty.add(matchId); return 0; }
   const eng = ar.engineReport as { perMove?: EngineMove[] };
-  if (!eng?.perMove) return 0;
+  if (!eng?.perMove) { triedEmpty.add(matchId); return 0; }
 
   let created = 0;
   let bmSeen = 0;

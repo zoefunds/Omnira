@@ -53,9 +53,9 @@ export async function flagMatchIfSuspicious(matchId: string): Promise<number> {
       analysis: { select: { engineReport: true } },
     },
   });
-  if (!m?.analysis?.engineReport) return 0;
+  if (!m?.analysis?.engineReport) { triedFlags.add(matchId); return 0; }
   const eng = m.analysis.engineReport as { perMove?: EngineMove[] };
-  if (!eng?.perMove || eng.perMove.length < 20) return 0;
+  if (!eng?.perMove || eng.perMove.length < 20) { triedFlags.add(matchId); return 0; }
 
   const white = emptyStats();
   const black = emptyStats();
