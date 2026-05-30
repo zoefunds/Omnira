@@ -7,15 +7,7 @@
   },
   "buildAptPackages": ["stockfish"],
   "steps": {
-    "install": {
-      "commands": [
-        "corepack enable",
-        "corepack prepare pnpm@9.12.0 --activate",
-        "pnpm install --frozen-lockfile"
-      ]
-    },
     "build": {
-      "inputs": [{ "step": "install" }],
       "commands": [
         "pnpm --filter @omnira/db generate",
         "pnpm --filter @omnira/worker build"
