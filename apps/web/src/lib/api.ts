@@ -104,6 +104,18 @@ export const api = {
   me(token: string) {
     return request<{ user: ApiUser }>('/auth/me', { method: 'GET', token });
   },
+  forgotPassword(body: { email: string }) {
+    return request<{ ok: true; message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  resetPassword(body: { token: string; newPassword: string }) {
+    return request<{ ok: true }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
   listChallenges() {
     return request<{ challenges: ApiChallenge[] }>('/challenges', { method: 'GET' });
   },

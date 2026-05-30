@@ -4,20 +4,27 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Crown, Mail, CheckCircle2, Wallet } from 'lucide-react';
 import { Field } from '@/components/Field';
+import { api } from '@/lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    // No-op in this build — surface the same UX a real reset would have.
-    setTimeout(() => {
-      setLoading(false);
+    setError(null);
+    try {
+      await api.forgotPassword({ email: email.trim() });
       setSent(true);
-    }, 600);
+    } catch {
+      // Backend already responds 200 to avoid enumeration; only network errors land here.
+      setError('Could not reach the server. Please try again in a moment.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -110,6 +117,7 @@ export default function ForgotPasswordPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
+              {error && <p className="text-sm text-danger">{error}</p>}
               <button
                 type="submit"
                 disabled={loading}

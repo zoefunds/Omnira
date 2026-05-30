@@ -5,6 +5,16 @@ import { signup, login, getMe, AuthError } from '../auth/service.js';
 import { env } from '../config/env.js';
 import { isLocked, recordFailure, clearFailures } from '../auth/lockout.js';
 import { createSession, findValidSession, revokeSession, revokeAllForUser, ACCESS_TTL_SEC } from '../auth/sessions.js';
+import { startPasswordReset, completePasswordReset, ResetError } from '../auth/passwordReset.js';
+
+const ForgotBody = z.object({
+  email: z.string().email().max(254),
+});
+
+const ResetBody = z.object({
+  token: z.string().min(32).max(256),
+  newPassword: z.string().min(10).max(128),
+});
 
 const SignupBody = z.object({
   email: z.string().email().max(254),
@@ -139,6 +149,58 @@ export async function registerAuthRoutes(app: FastifyInstance) {
     await revokeAllForUser(req.user.sub).catch(() => {});
     return reply.send({ ok: true });
   });
+
+  // Forgot password — always responds 200 with a neutral message to avoid
+  // leaking which emails are registered. Heavily rate-limited per IP.
+  app.post(
+    '/auth/forgot-password',
+    { config: { rateLimit: { max: 5, timeWindow: '15 minutes' } } },
+    async (req, reply) => {
+      const parsed = ForgotBody.safeParse(req.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'INVALID_BODY', issues: parsed.error.flatten() });
+      }
+      try {
+        await startPasswordReset({
+          email: parsed.data.email,
+          ipHash: ipHashFromReq(req),
+        });
+      } catch (e) {
+        // Log but still respond 200 to avoid enumeration.
+        app.log.error({ err: e }, 'forgot-password start failed');
+      }
+      return reply.send({
+        ok: true,
+        message:
+          'If an account exists for that email, a reset link has been sent.',
+      });
+    },
+  );
+
+  app.post(
+    '/auth/reset-password',
+    { config: TIGHT_RL },
+    async (req, reply) => {
+      const parsed = ResetBody.safeParse(req.body);
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send({ error: 'INVALID_BODY', issues: parsed.error.flatten() });
+      }
+      try {
+        await completePasswordReset(parsed.data);
+        return reply.send({ ok: true });
+      } catch (e) {
+        if (e instanceof ResetError) {
+          return reply.code(e.status).send({ error: e.code, message: e.message });
+        }
+        app.log.error({ err: e }, 'reset-password failed');
+        return reply.code(500).send({ error: 'INTERNAL' });
+      }
+    },
+  );
 
   app.get('/auth/me', async (req, reply) => {
     try { await req.jwtVerify(); } catch { return reply.code(401).send({ error: 'UNAUTHORIZED' }); }

@@ -28,6 +28,11 @@ const EnvSchema = z.object({
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
   ADMIN_TOKEN: z.string().min(32).optional(),
+
+  // Password reset email
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Omnira <onboarding@resend.dev>'),
+  WEB_BASE_URL: z.string().url().default('https://omnira-blond.vercel.app'),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

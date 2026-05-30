@@ -42,8 +42,26 @@ model User {
   challengesAccepted Challenge[]  @relation("ChallengesAccepted")
   chatMessages       ChatMessage[] @relation("ChatMessages")
   sessions      Session[]
+  passwordResets PasswordResetToken[]
 
   @@index([createdAt])
+}
+
+// ─────────────────────────── PASSWORD RESET ───────────────────────────
+// Stores SHA-256 hashes of one-time reset tokens. The raw token is only
+// ever sent in the email; verification re-hashes and looks up by hash.
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  ipHash    String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
 }
 
 model Session {
