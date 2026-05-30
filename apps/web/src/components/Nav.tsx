@@ -154,11 +154,20 @@ export function Nav() {
       {/* ─────────── Mobile drawer ─────────── */}
       {user && mobileOpen && (
         <div
-          className="md:hidden fixed inset-x-0 top-16 bottom-0 z-30 bg-parchment-200/95 backdrop-blur-md border-t border-parchment-300 animate-in fade-in slide-in-from-top-2"
+          className="md:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-parchment-200 border-t border-parchment-300 overflow-y-auto animate-in fade-in slide-in-from-top-2"
           onClick={() => setMobileOpen(false)}
         >
+          {/* Subtle paper texture so it doesn't look like a flat sheet */}
           <div
-            className="px-4 py-6 max-w-md mx-auto"
+            aria-hidden
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                'radial-gradient(rgba(0,0,0,0.015) 1px, transparent 1px) 0 0 / 3px 3px',
+            }}
+          />
+          <div
+            className="relative px-4 py-6 max-w-md mx-auto"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Profile chip */}
