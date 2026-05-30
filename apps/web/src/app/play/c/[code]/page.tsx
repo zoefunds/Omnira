@@ -54,7 +54,7 @@ export default function PrivateChallengePage() {
   }
 
   return (
-    <section className="max-w-md">
+    <section className="max-w-md mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <h1 className="font-serif text-3xl text-ink-900">Private game</h1>
       <p className="mt-2 text-ink-600">
         {challenge.creator.username} invites you to play.

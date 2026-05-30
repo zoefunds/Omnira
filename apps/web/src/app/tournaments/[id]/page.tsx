@@ -106,8 +106,8 @@ export default function TournamentPage() {
   }
 
   return (
-    <section className="space-y-6">
-      <header className="flex items-end justify-between">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-6">
+      <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <div className="text-xs uppercase tracking-wider text-ink-400">Arena · {t.status.toLowerCase()}</div>
           <h1 className="font-serif text-3xl text-ink-900 mt-1">{t.name}</h1>

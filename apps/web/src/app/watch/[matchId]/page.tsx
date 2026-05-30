@@ -96,8 +96,8 @@ export default function WatchMatchPage() {
   const ended = m.status !== 'ACTIVE' && m.status !== 'PENDING';
 
   return (
-    <section className="grid lg:grid-cols-[1fr_auto] gap-6 items-start">
-      <div className="max-w-[640px] w-full">
+    <section className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10 grid lg:grid-cols-[1fr_auto] gap-5 lg:gap-6 items-start">
+      <div className="max-w-full lg:max-w-[640px] w-full mx-auto">
         <div className="mb-3 rounded-xl border border-parchment-300 bg-parchment-100 px-4 py-2 flex items-baseline justify-between">
           <Link href={`/u/${m.blackPlayer.username}`} className="text-ink-900 hover:underline">{m.blackPlayer.username}</Link>
           <span className="font-mono text-ink-900">{fmtMs(blackMs)}</span>
