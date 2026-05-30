@@ -90,11 +90,24 @@ const isMain = import.meta.url === `file://${process.argv[1]}`;
 if (isMain) {
   const cfg = env();
   buildServer()
-    .then((app) =>
-      app.listen({ port: cfg.API_PORT, host: '0.0.0.0' }).then(() => {
+    .then(async (app) => {
+      // Mark abandoned matches from previous container life as ABORTED so they
+      // disappear from /matches/active and /me/current-match.
+      try {
+        const { prisma } = await import('@omnira/db');
+        const r = await prisma.match.updateMany({
+          where: { status: 'ACTIVE' },
+          data: { status: 'ABORTED', resultReason: 'ABANDONED', endedAt: new Date() },
+        });
+        if (r.count > 0) app.log.info({ count: r.count }, 'aborted orphan matches on boot');
+      } catch (e) {
+        app.log.warn({ err: (e as Error).message }, 'orphan match cleanup failed');
+      }
+
+      return app.listen({ port: cfg.API_PORT, host: '0.0.0.0' }).then(() => {
         app.log.info(`omnira-api listening on :${cfg.API_PORT}`);
-      }),
-    )
+      });
+    })
     .catch((e) => {
       console.error(e);
       process.exit(1);

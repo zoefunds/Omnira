@@ -50,6 +50,22 @@ export interface MatchState {
   onDrawOffer: (from: Color) => void;
   onMatchEnd: (p: { outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW'; reason: string }) => void;
   setChain: (c: { matchTx: string | null; settledAt: string | null } | null) => void;
+  /** Rehydrate from a full snapshot — used on page reload to rejoin an active match. */
+  hydrate: (p: {
+    matchId: string;
+    whitePlayerId: string;
+    blackPlayerId: string;
+    myUserId: string;
+    fen: string;
+    initialMs: number;
+    incrementMs: number;
+    whiteMs: number;
+    blackMs: number;
+    turn: Color;
+    ply: number;
+    history: MatchHistoryItem[];
+    drawOfferFrom: Color | null;
+  }) => void;
   reset: () => void;
 }
 
@@ -62,6 +78,8 @@ const initial = (): Omit<
   | 'onMatchMove'
   | 'onDrawOffer'
   | 'onMatchEnd'
+  | 'hydrate'
+  | 'setChain'
   | 'reset'
 > => ({
   matchId: null,
@@ -114,5 +132,23 @@ export const useMatch = create<MatchState>((set) => ({
   onDrawOffer: (from) => set({ drawOfferFrom: from }),
   onMatchEnd: (p) => set({ ended: p }),
   setChain: (c) => set({ chain: c }),
+  hydrate: (p) =>
+    set({
+      matchId: p.matchId,
+      fen: p.fen,
+      myColor: p.whitePlayerId === p.myUserId ? 'w' : 'b',
+      opponentId:
+        p.whitePlayerId === p.myUserId ? p.blackPlayerId : p.whitePlayerId,
+      initialMs: p.initialMs,
+      incrementMs: p.incrementMs,
+      whiteMs: p.whiteMs,
+      blackMs: p.blackMs,
+      turn: p.turn,
+      history: p.history,
+      clockTickFrom: Date.now(),
+      ended: null,
+      drawOfferFrom: p.drawOfferFrom,
+      queueStatus: 'matched',
+    }),
   reset: () => set(initial()),
 }));

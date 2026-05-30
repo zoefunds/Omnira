@@ -10,6 +10,7 @@ import { ChallengesList } from '@/components/ChallengesList';
 import { CreateChallengeModal } from '@/components/CreateChallengeModal';
 import { PlaySidebar } from '@/components/PlaySidebar';
 import { Plus } from 'lucide-react';
+import { api } from '@/lib/api';
 
 export default function LobbyPage() {
   const router = useRouter();
@@ -22,6 +23,30 @@ export default function LobbyPage() {
     if (!hydrated) return;
     if (!user || !token) router.replace('/login');
   }, [hydrated, user, token, router]);
+
+  // If the user has an active game on the server (e.g. after a page reload),
+  // rehydrate the match store and jump straight to /play.
+  useEffect(() => {
+    if (!user || !token || !socket) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { match } = await api.currentMatch(token);
+        if (cancelled || !match || match.ended) return;
+        m.hydrate({ ...match, myUserId: user.id });
+        socket.emit(
+          'match:rejoin',
+          { matchId: match.matchId },
+          (_ack: { ok: boolean }) => {},
+        );
+        router.replace('/play');
+      } catch {
+        // ignore — fall through to normal lobby
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, token, socket]);
 
   useEffect(() => {
     if (!socket || !user) return;

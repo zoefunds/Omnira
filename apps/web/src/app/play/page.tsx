@@ -8,6 +8,7 @@ import { useSocket } from '@/hooks/useSocket';
 // /play now only renders the active match; the matchmaking lobby lives at /lobby.
 import { MatchView } from '@/components/MatchView';
 import { PlaySidebar } from '@/components/PlaySidebar';
+import { api } from '@/lib/api';
 
 export default function PlayPage() {
   const router = useRouter();
@@ -19,6 +20,29 @@ export default function PlayPage() {
     if (!hydrated) return;
     if (!user || !token) router.replace('/login');
   }, [hydrated, user, token, router]);
+
+  // Rejoin on direct /play visit if local state is empty (page reload, deep link).
+  useEffect(() => {
+    if (!user || !token || !socket) return;
+    if (m.matchId) return; // already in a match locally
+    let cancelled = false;
+    (async () => {
+      try {
+        const { match } = await api.currentMatch(token);
+        if (cancelled || !match || match.ended) {
+          // No server-side active match: send the user back to the lobby.
+          router.replace('/lobby');
+          return;
+        }
+        m.hydrate({ ...match, myUserId: user.id });
+        socket.emit('match:rejoin', { matchId: match.matchId }, () => {});
+      } catch {
+        router.replace('/lobby');
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, token, socket]);
 
   useEffect(() => {
     if (!socket || !user) return;

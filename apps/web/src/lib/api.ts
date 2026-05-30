@@ -104,6 +104,25 @@ export const api = {
   me(token: string) {
     return request<{ user: ApiUser }>('/auth/me', { method: 'GET', token });
   },
+  currentMatch(token: string) {
+    return request<{
+      match: {
+        matchId: string;
+        whitePlayerId: string;
+        blackPlayerId: string;
+        fen: string;
+        initialMs: number;
+        incrementMs: number;
+        whiteMs: number;
+        blackMs: number;
+        turn: 'w' | 'b';
+        ply: number;
+        history: Array<{ ply: number; san: string; uci: string }>;
+        ended: boolean;
+        drawOfferFrom: 'w' | 'b' | null;
+      } | null;
+    }>('/me/current-match', { method: 'GET', token });
+  },
   forgotPassword(body: { email: string }) {
     return request<{ ok: true; message: string }>('/auth/forgot-password', {
       method: 'POST',

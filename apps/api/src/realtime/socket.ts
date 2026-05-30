@@ -103,6 +103,18 @@ export function attachRealtime(app: FastifyInstance): Server {
     });
 
 
+    // Rejoin a player's own active match's broadcast room after a page reload
+    // or socket reconnect. Does NOT change game state — just resubscribes.
+    s.on('match:rejoin', async (payload: { matchId: string }, ack) => {
+      const room = getRoom(payload.matchId);
+      if (!room) return ack?.({ ok: false, error: 'NO_MATCH' });
+      if (room.whitePlayerId !== userId && room.blackPlayerId !== userId) {
+        return ack?.({ ok: false, error: 'FORBIDDEN' });
+      }
+      s.join(`match:${room.id}`);
+      ack?.({ ok: true });
+    });
+
     s.on('match:watch', async (payload: { matchId: string }, ack) => {
       if (!/^[0-9a-fA-F-]{36}$/.test(payload.matchId)) return ack?.({ ok: false, error: 'BAD_ID' });
       s.join(`match:${payload.matchId}`);

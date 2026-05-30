@@ -1,13 +1,46 @@
 import type { FastifyInstance } from 'fastify';
 import { prisma } from '@omnira/db';
 import { env } from '../config/env.js';
+import { getRoom, snapshotRoom, listLiveRoomIds } from '../match/runtime.js';
 
 export async function registerMatchRoutes(app: FastifyInstance) {
 
+  // Current active match for the signed-in user — used for rejoin after refresh.
+  app.get('/me/current-match', async (req, reply) => {
+    try { await req.jwtVerify(); } catch { return reply.code(401).send({ error: 'UNAUTHORIZED' }); }
+    const userId = (req.user as { sub: string }).sub;
+
+    // Look up the user's most recent ACTIVE match in the DB.
+    const m = await prisma.match.findFirst({
+      where: {
+        status: 'ACTIVE',
+        OR: [{ whitePlayerId: userId }, { blackPlayerId: userId }],
+      },
+      orderBy: { startedAt: 'desc' },
+      select: { id: true },
+    });
+    if (!m) return reply.send({ match: null });
+
+    // If the in-memory room still exists, return a live snapshot.
+    const room = getRoom(m.id);
+    if (!room || room.ended) {
+      // Server lost the room (restart, abandon). Mark abandoned so it stops
+      // appearing in Watch and the user gets a clean lobby state.
+      await prisma.match.update({
+        where: { id: m.id },
+        data: { status: 'ABORTED', resultReason: 'ABANDONED', endedAt: new Date() },
+      }).catch(() => {});
+      return reply.send({ match: null });
+    }
+    return reply.send({ match: snapshotRoom(room) });
+  });
+
   app.get('/matches/active', { config: { rateLimit: false } }, async (req, reply) => {
-    const { prisma } = await import('@omnira/db');
+    void req; void reply;
+    const liveIds = new Set(listLiveRoomIds());
+    if (liveIds.size === 0) return { matches: [] };
     const rows = await prisma.match.findMany({
-      where: { status: 'ACTIVE' },
+      where: { status: 'ACTIVE', id: { in: Array.from(liveIds) } },
       select: {
         id: true,
         whitePlayerId: true,
@@ -42,7 +75,6 @@ export async function registerMatchRoutes(app: FastifyInstance) {
   app.get('/match/:id', { config: { rateLimit: false } }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!/^[0-9a-fA-F-]{36}$/.test(id)) return reply.code(400).send({ error: 'BAD_ID' });
-    const { prisma } = await import('@omnira/db');
     const m = await prisma.match.findUnique({
       where: { id },
       select: {

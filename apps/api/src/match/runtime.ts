@@ -6,6 +6,7 @@ import {
   stopClock,
   isFlagged,
   classify,
+  remainingMs,
   type ClockState,
   type TimeControl,
   type GameOverState,
@@ -270,4 +271,48 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
 // Test/cleanup helper
 export function _resetRooms() {
   rooms.clear();
+}
+
+/** Snapshot the in-memory room state so a reconnecting client can rehydrate. */
+export function snapshotRoom(room: MatchRoom, now: number = Date.now()): {
+  matchId: string;
+  whitePlayerId: string;
+  blackPlayerId: string;
+  fen: string;
+  initialMs: number;
+  incrementMs: number;
+  whiteMs: number;
+  blackMs: number;
+  turn: Color;
+  ply: number;
+  history: Array<{ ply: number; san: string; uci: string }>;
+  ended: boolean;
+  drawOfferFrom: Color | null;
+} {
+  // Compute live clocks at "now" by subtracting elapsed since clock.tickFrom.
+  const live = remainingMs(room.clock, now);
+  return {
+    matchId: room.id,
+    whitePlayerId: room.whitePlayerId,
+    blackPlayerId: room.blackPlayerId,
+    fen: room.game.fen(),
+    initialMs: room.tc.initialMs,
+    incrementMs: room.tc.incrementMs,
+    whiteMs: live.whiteMs,
+    blackMs: live.blackMs,
+    turn: room.game.turn(),
+    ply: room.ply,
+    history: room.game.history({ verbose: false }).map((san, i) => ({
+      ply: i + 1,
+      san,
+      uci: '',
+    })),
+    ended: room.ended,
+    drawOfferFrom: room.drawOfferFrom,
+  };
+}
+
+/** Listing for the spectator grid — rooms in memory only (no DB ghosts). */
+export function listLiveRoomIds(): string[] {
+  return Array.from(rooms.keys());
 }
