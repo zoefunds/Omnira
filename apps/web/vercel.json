@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "cd ../.. && pnpm install --frozen-lockfile && pnpm --filter @omnira/db generate && pnpm --filter @omnira/web build",
+  "installCommand": "echo skip-default-install",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
+}

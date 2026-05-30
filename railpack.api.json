@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.railpack.com",
+  "provider": "node",
+  "packages": {
+    "node": "20",
+    "pnpm": "9"
+  },
+  "buildAptPackages": ["stockfish"],
+  "steps": {
+    "install": {
+      "commands": [
+        "corepack enable",
+        "pnpm install --frozen-lockfile"
+      ]
+    },
+    "build": {
+      "inputs": [{ "step": "install" }],
+      "commands": [
+        "pnpm --filter @omnira/db generate",
+        "pnpm --filter @omnira/api build"
+      ]
+    }
+  },
+  "deploy": {
+    "aptPackages": ["stockfish"],
+    "startCommand": "node --enable-source-maps apps/api/dist/server.js"
+  }
+}
