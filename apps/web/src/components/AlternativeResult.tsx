@@ -4,7 +4,7 @@ import type { ApiAlternative } from '@/store/alternatives';
 
 function fmtEval(cp: number | null, mate: number | null) {
   if (mate != null) return `#${mate}`;
-  if (cp == null) return '—';
+  if (cp == null) return '·';
   const v = cp / 100;
   return (v > 0 ? '+' : '') + v.toFixed(2);
 }

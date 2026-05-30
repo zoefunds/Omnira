@@ -128,7 +128,7 @@ export default function WatchMatchPage() {
       <aside className="w-full lg:w-72 rounded-xl border border-parchment-300 bg-parchment-100 p-4">
         <div className="text-xs uppercase tracking-wider text-ink-400 mb-2">Moves</div>
         <ol className="max-h-[28rem] overflow-y-auto font-mono text-sm text-ink-900 space-y-0.5">
-          {rows.length === 0 && <li className="text-ink-400">—</li>}
+          {rows.length === 0 && <li className="text-ink-400">·</li>}
           {rows.map((r) => (
             <li key={r.n} className="flex gap-3">
               <span className="w-6 text-right text-ink-400">{r.n}.</span>

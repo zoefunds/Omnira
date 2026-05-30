@@ -239,7 +239,7 @@ export default function ProfilePage() {
               </div>
               <div className="mt-3 flex items-center justify-between text-xs">
                 <span className="text-ink-400">
-                  Peak: <span className="text-ink-600">{peak ?? '—'}</span>
+                  Peak: <span className="text-ink-600">{peak ?? 'N/A'}</span>
                 </span>
                 <span
                   className={`font-medium ${
@@ -311,7 +311,7 @@ export default function ProfilePage() {
                       className="grid grid-cols-[1fr_2fr_auto_auto] items-center py-3 text-sm"
                     >
                       <div className="text-ink-600">
-                        {m.endedAt ? fmtDateShort(m.endedAt) : '—'}
+                        {m.endedAt ? fmtDateShort(m.endedAt) : 'N/A'}
                       </div>
                       <div className="truncate">
                         <Link
@@ -328,7 +328,7 @@ export default function ProfilePage() {
                         <ResultPill result={result} />
                       </div>
                       <div className="w-20 text-right font-mono text-ink-900">
-                        {ratingAfter ?? '—'}
+                        {ratingAfter ?? 'N/A'}
                       </div>
                     </div>
                   );
@@ -515,7 +515,7 @@ export default function ProfilePage() {
 /* ─────────────────── helpers ─────────────────── */
 
 function topRating(ratings: ApiProfile['ratings']) {
-  if (!ratings.length) return '—';
+  if (!ratings.length) return 'N/A';
   return Math.max(...ratings.map((r) => r.rating));
 }
 
@@ -656,7 +656,7 @@ function buildHeatmap(matches: ApiProfileMatch[]): {
     cells.push({ date: key, count, level });
   }
 
-  // Month labels — 5 evenly spaced.
+  // Month labels: 5 evenly spaced.
   const months = ['', '', '', '', ''];
   const monthsAgo = (n: number) => {
     const d = new Date(today);

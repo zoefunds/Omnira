@@ -4,11 +4,28 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Chess, type Square } from 'chess.js';
-import { api, type ApiPuzzle, type ApiPuzzleAttemptResponse, type ApiPuzzleStats } from '@/lib/api';
+import {
+  api,
+  type ApiPuzzle,
+  type ApiPuzzleAttemptResponse,
+  type ApiPuzzleStats,
+} from '@/lib/api';
 import { useAuth } from '@/store/auth';
-import { Button } from '@/components/Button';
+import {
+  Puzzle,
+  CheckCircle2,
+  XCircle,
+  SkipForward,
+  ArrowRight,
+  Trophy,
+  Target,
+  Flame,
+} from 'lucide-react';
 
-const Chessboard = dynamic(() => import('react-chessboard').then((m) => m.Chessboard), { ssr: false });
+const Chessboard = dynamic(
+  () => import('react-chessboard').then((m) => m.Chessboard),
+  { ssr: false },
+);
 
 type Phase = 'loading' | 'solving' | 'graded' | 'empty';
 
@@ -22,11 +39,16 @@ export default function PuzzlesPage() {
   const [graded, setGraded] = useState<ApiPuzzleAttemptResponse | null>(null);
   const [startTs, setStartTs] = useState<number>(Date.now());
 
-  useEffect(() => { if (!hydrated) return; if (!user) router.replace('/login'); }, [hydrated, user, router]);
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!user) router.replace('/login');
+  }, [hydrated, user, router]);
 
   const loadNext = useCallback(async () => {
     if (!token || !user) return;
-    setPhase('loading'); setGraded(null); setSelected(null);
+    setPhase('loading');
+    setGraded(null);
+    setSelected(null);
     try {
       const r = await api.getNextPuzzle(token);
       if (r && 'puzzle' in r && r.puzzle) {
@@ -45,14 +67,25 @@ export default function PuzzlesPage() {
     }
   }, [token, user]);
 
-  useEffect(() => { void loadNext(); }, [loadNext]);
+  useEffect(() => {
+    void loadNext();
+  }, [loadNext]);
 
-  const chess = useMemo(() => (puzzle ? new Chess(puzzle.fen) : null), [puzzle]);
+  const chess = useMemo(
+    () => (puzzle ? new Chess(puzzle.fen) : null),
+    [puzzle],
+  );
   const myColor = puzzle?.sideToMove ?? 'w';
 
   const legalTargets: Set<string> = useMemo(() => {
     if (!chess || !selected) return new Set();
-    return new Set((chess.moves({ square: selected, verbose: true }) as Array<{ to: string }>).map((m) => m.to));
+    return new Set(
+      (
+        chess.moves({ square: selected, verbose: true }) as Array<{
+          to: string;
+        }>
+      ).map((m) => m.to),
+    );
   }, [chess, selected]);
 
   function isMyPieceOn(square: Square): boolean {
@@ -64,10 +97,14 @@ export default function PuzzlesPage() {
   async function trySubmit(from: Square, to: Square, promotion?: string) {
     if (!chess || !puzzle || !token || phase !== 'solving') return;
     const uci = `${from}${to}${promotion ?? ''}`;
-    const result: 'CORRECT' | 'WRONG' = uci === puzzle.solutionUci ? 'CORRECT' : 'WRONG';
+    const result: 'CORRECT' | 'WRONG' =
+      uci === puzzle.solutionUci ? 'CORRECT' : 'WRONG';
     const thinkMs = Date.now() - startTs;
     setPhase('loading');
-    const grade = await api.submitPuzzleAttempt({ puzzleId: puzzle.id, submittedUci: uci, result, thinkMs }, token);
+    const grade = await api.submitPuzzleAttempt(
+      { puzzleId: puzzle.id, submittedUci: uci, result, thinkMs },
+      token,
+    );
     setGraded(grade);
     setPhase('graded');
     if (user) {
@@ -79,7 +116,14 @@ export default function PuzzlesPage() {
   async function skip() {
     if (!puzzle || !token || phase !== 'solving') return;
     setPhase('loading');
-    const grade = await api.submitPuzzleAttempt({ puzzleId: puzzle.id, result: 'SKIPPED', thinkMs: Date.now() - startTs }, token);
+    const grade = await api.submitPuzzleAttempt(
+      {
+        puzzleId: puzzle.id,
+        result: 'SKIPPED',
+        thinkMs: Date.now() - startTs,
+      },
+      token,
+    );
     setGraded(grade);
     setPhase('graded');
   }
@@ -90,11 +134,23 @@ export default function PuzzlesPage() {
       if (isMyPieceOn(square)) setSelected(square);
       return;
     }
-    if (selected === square) { setSelected(null); return; }
-    if (isMyPieceOn(square)) { setSelected(square); return; }
+    if (selected === square) {
+      setSelected(null);
+      return;
+    }
+    if (isMyPieceOn(square)) {
+      setSelected(square);
+      return;
+    }
     if (legalTargets.has(square)) {
       const moving = chess.get(selected);
-      const promo = (moving && moving.type === 'p' && ((moving.color === 'w' && square[1] === '8') || (moving.color === 'b' && square[1] === '1'))) ? 'q' : undefined;
+      const promo =
+        moving &&
+        moving.type === 'p' &&
+        ((moving.color === 'w' && square[1] === '8') ||
+          (moving.color === 'b' && square[1] === '1'))
+          ? 'q'
+          : undefined;
       void trySubmit(selected, square, promo);
       setSelected(null);
       return;
@@ -103,89 +159,294 @@ export default function PuzzlesPage() {
   }
 
   if (!user) return null;
-  if (phase === 'loading') return <div className="text-ink-600 text-sm">Loading puzzle…</div>;
 
+  /* ───── Loading ───── */
+  if (phase === 'loading') {
+    return (
+      <div className="max-w-7xl mx-auto px-6 py-20">
+        <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-16 text-center">
+          <div className="mx-auto h-12 w-12 rounded-full bg-parchment-200 border border-parchment-300 flex items-center justify-center">
+            <Puzzle
+              size={20}
+              className="text-gold-600 animate-pulse"
+              strokeWidth={1.5}
+            />
+          </div>
+          <p className="mt-4 text-sm text-ink-600">Loading next puzzle.</p>
+        </div>
+      </div>
+    );
+  }
+
+  /* ───── Empty state ───── */
   if (phase === 'empty') {
     return (
-      <section className="max-w-md">
-        <h1 className="font-serif text-3xl text-ink-900">Puzzles</h1>
-        <p className="mt-3 text-sm text-ink-600">
-          No more puzzles available — every published puzzle is in your attempt history,
-          or the generator hasn't surfaced new ones yet. Come back after more games finish.
-        </p>
-        <Button className="mt-4" onClick={loadNext}>Try again</Button>
-      </section>
+      <div className="max-w-7xl mx-auto px-6 py-10">
+        <Header stats={stats} />
+        <div className="mt-8 rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-16 text-center">
+          <div className="mx-auto h-14 w-14 rounded-full bg-gold-shine flex items-center justify-center shadow-soft">
+            <CheckCircle2
+              size={26}
+              className="text-parchment-50"
+              strokeWidth={1.5}
+            />
+          </div>
+          <h2 className="mt-5 font-serif text-2xl text-ink-900">
+            You&apos;ve cleared the board
+          </h2>
+          <p className="mt-2 text-sm text-ink-600 max-w-md mx-auto">
+            Every published puzzle is already in your attempt history. New
+            tactics surface as more games finish across Omnira. Check back soon.
+          </p>
+          <button
+            onClick={loadNext}
+            className="mt-6 inline-flex items-center gap-2 rounded-md bg-gold-shine px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
+          >
+            Try again
+            <ArrowRight size={16} />
+          </button>
+        </div>
+      </div>
     );
   }
 
   if (!puzzle || !chess) return null;
 
+  /* ───── Board styles ───── */
   const squareStyles: Record<string, React.CSSProperties> = {};
   if (selected) {
-    squareStyles[selected] = { background: 'rgba(47,107,79,0.35)' };
+    squareStyles[selected] = { background: 'rgba(184,144,31,0.25)' };
     for (const t of legalTargets) {
       const occ = !!chess.get(t as Square);
       squareStyles[t] = occ
-        ? { boxShadow: 'inset 0 0 0 4px rgba(161,58,46,0.55)' }
-        : { background: 'radial-gradient(circle, rgba(47,107,79,0.45) 18%, transparent 22%)' };
+        ? { boxShadow: 'inset 0 0 0 4px rgba(161,58,46,0.45)' }
+        : {
+            background:
+              'radial-gradient(circle, rgba(184,144,31,0.45) 18%, transparent 22%)',
+          };
     }
   }
 
   return (
-    <section className="grid lg:grid-cols-[1fr_auto] gap-6 items-start">
-      <div className="max-w-[640px] w-full">
-        <div className="rounded-xl overflow-hidden shadow-soft">
-          <Chessboard
-            position={puzzle.fen}
-            boardOrientation={myColor === 'w' ? 'white' : 'black'}
-            arePiecesDraggable={false}
-            onSquareClick={onSquareClick}
-            customSquareStyles={squareStyles}
-            customBoardStyle={{ borderRadius: '0.875rem' }}
-            customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-            customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+    <div className="max-w-7xl mx-auto px-6 py-10">
+      <Header stats={stats} />
+
+      <div className="mt-8 grid lg:grid-cols-[1fr_360px] gap-8 items-start">
+        {/* Board */}
+        <div>
+          <div className="rounded-xl overflow-hidden shadow-card border border-parchment-300">
+            <Chessboard
+              position={puzzle.fen}
+              boardOrientation={myColor === 'w' ? 'white' : 'black'}
+              arePiecesDraggable={false}
+              onSquareClick={onSquareClick}
+              customSquareStyles={squareStyles}
+              customBoardStyle={{ borderRadius: '0.75rem' }}
+              customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
+              customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+            />
+          </div>
+          <div className="mt-4 flex items-center justify-between">
+            <div className="text-sm text-ink-600">
+              <span className="font-medium text-ink-900">
+                {myColor === 'w' ? 'White' : 'Black'}
+              </span>{' '}
+              to move. Find the best move.
+            </div>
+            {phase === 'solving' && (
+              <button
+                onClick={skip}
+                className="inline-flex items-center gap-2 rounded-md border border-parchment-400 px-4 py-2 text-sm text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
+              >
+                <SkipForward size={14} strokeWidth={1.5} />
+                Skip
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Side panel */}
+        <aside className="space-y-5">
+          {/* Current puzzle */}
+          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="text-xs uppercase tracking-wider text-ink-400">
+                  This puzzle
+                </div>
+                <div className="mt-1 font-serif text-4xl text-ink-900">
+                  {puzzle.rating}
+                </div>
+              </div>
+              <div className="h-9 w-9 rounded-md bg-parchment-50 border border-parchment-300 flex items-center justify-center text-gold-600">
+                <Target size={16} strokeWidth={1.5} />
+              </div>
+            </div>
+            {puzzle.themes.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-1.5">
+                {puzzle.themes.map((t) => (
+                  <span
+                    key={t}
+                    className="text-[11px] rounded-full bg-parchment-50 border border-parchment-300 px-2 py-0.5 text-ink-600"
+                  >
+                    {t}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Your stats */}
+          {stats && (
+            <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-5">
+              <div className="text-xs uppercase tracking-wider text-ink-400">
+                Your puzzle rating
+              </div>
+              <div className="mt-1 font-serif text-4xl text-ink-900">
+                {stats.rating}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-3 text-center">
+                <div className="rounded-md bg-parchment-50 border border-parchment-300 py-2">
+                  <div className="text-[10px] uppercase tracking-wider text-ink-400">
+                    Solved
+                  </div>
+                  <div className="font-mono text-lg text-ink-900">
+                    {stats.solved}
+                  </div>
+                </div>
+                <div className="rounded-md bg-parchment-50 border border-parchment-300 py-2">
+                  <div className="text-[10px] uppercase tracking-wider text-ink-400">
+                    Attempted
+                  </div>
+                  <div className="font-mono text-lg text-ink-900">
+                    {stats.attempted}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Grade card */}
+          {phase === 'graded' && graded && (
+            <div
+              className={`rounded-xl border p-5 shadow-card ${
+                graded.result === 'CORRECT'
+                  ? 'border-gold-300 bg-parchment-50'
+                  : graded.result === 'WRONG'
+                  ? 'border-danger/30 bg-parchment-50'
+                  : 'border-parchment-300 bg-parchment-50'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {graded.result === 'CORRECT' ? (
+                  <CheckCircle2
+                    size={22}
+                    className="text-gold-600"
+                    strokeWidth={1.5}
+                  />
+                ) : graded.result === 'WRONG' ? (
+                  <XCircle
+                    size={22}
+                    className="text-danger"
+                    strokeWidth={1.5}
+                  />
+                ) : (
+                  <SkipForward
+                    size={22}
+                    className="text-ink-400"
+                    strokeWidth={1.5}
+                  />
+                )}
+                <span
+                  className={`font-medium ${
+                    graded.result === 'CORRECT'
+                      ? 'text-gold-700'
+                      : graded.result === 'WRONG'
+                      ? 'text-danger'
+                      : 'text-ink-600'
+                  }`}
+                >
+                  {graded.result === 'CORRECT'
+                    ? 'Correct'
+                    : graded.result === 'WRONG'
+                    ? 'Engine prefers a different move'
+                    : 'Skipped'}
+                </span>
+              </div>
+              <div className="mt-3 text-xs text-ink-600">
+                Solution:{' '}
+                <span className="font-mono text-ink-900">
+                  {graded.solutionSan}
+                </span>
+              </div>
+              <button
+                onClick={loadNext}
+                className="mt-4 w-full inline-flex items-center justify-center gap-2 rounded-md bg-gold-shine px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
+              >
+                Next puzzle
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+function Header({ stats }: { stats: ApiPuzzleStats | null }) {
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-2">
+          Daily Tactics
+        </p>
+        <h1 className="font-serif text-4xl text-ink-900">Puzzles</h1>
+        <p className="mt-2 text-sm text-ink-600">
+          Sharpen your pattern recognition with engine-curated positions.
+        </p>
+      </div>
+      {stats && (
+        <div className="flex items-center gap-3">
+          <Stat
+            icon={<Trophy size={14} strokeWidth={1.5} />}
+            label="Rating"
+            value={String(stats.rating)}
+          />
+          <Stat
+            icon={<CheckCircle2 size={14} strokeWidth={1.5} />}
+            label="Solved"
+            value={String(stats.solved)}
+          />
+          <Stat
+            icon={<Flame size={14} strokeWidth={1.5} />}
+            label="Attempted"
+            value={String(stats.attempted)}
           />
         </div>
-        <div className="mt-3 text-sm text-ink-600">
-          <span className="font-medium text-ink-900">{myColor === 'w' ? 'White' : 'Black'}</span> to move · find the best move.
-        </div>
+      )}
+    </header>
+  );
+}
+
+function Stat({
+  icon,
+  label,
+  value,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="rounded-md border border-parchment-300 bg-parchment-100/60 px-3 py-2 min-w-[80px]">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-ink-400">
+        {icon}
+        {label}
       </div>
-
-      <aside className="w-full lg:w-80 space-y-4">
-        <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-4">
-          <div className="text-[10px] uppercase tracking-wider text-ink-400">Puzzle</div>
-          <div className="mt-1 font-mono text-2xl text-ink-900">{puzzle.rating}</div>
-          <div className="mt-1 flex flex-wrap gap-1.5">
-            {puzzle.themes.map((t) => (
-              <span key={t} className="text-[11px] rounded-full bg-parchment-200 border border-parchment-300 px-2 py-0.5 text-ink-600">{t}</span>
-            ))}
-          </div>
-        </div>
-
-        {stats && (
-          <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-4">
-            <div className="text-[10px] uppercase tracking-wider text-ink-400">Your puzzle rating</div>
-            <div className="mt-1 font-mono text-2xl text-ink-900">{stats.rating}</div>
-            <div className="mt-1 text-xs text-ink-600">{stats.solved} solved · {stats.attempted} attempted</div>
-          </div>
-        )}
-
-        {phase === 'graded' && graded && (
-          <div className={`rounded-xl border p-4 ${graded.result === 'CORRECT' ? 'border-accent/40 bg-parchment-50' : 'border-danger/40 bg-parchment-50'}`}>
-            <div className={`text-sm font-medium ${graded.result === 'CORRECT' ? 'text-accent' : 'text-danger'}`}>
-              {graded.result === 'CORRECT' ? 'Correct ✓' : graded.result === 'WRONG' ? 'Engine prefers a different move' : 'Skipped'}
-            </div>
-            <div className="mt-2 text-xs text-ink-600">
-              Solution: <span className="font-mono text-ink-900">{graded.solutionSan}</span>
-            </div>
-            <Button className="mt-3 w-full" onClick={loadNext}>Next puzzle</Button>
-          </div>
-        )}
-
-        {phase === 'solving' && (
-          <Button variant="ghost" onClick={skip} className="w-full">Skip puzzle</Button>
-        )}
-      </aside>
-    </section>
+      <div className="font-mono text-lg text-ink-900 leading-none mt-1">
+        {value}
+      </div>
+    </div>
   );
 }

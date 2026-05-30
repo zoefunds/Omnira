@@ -169,7 +169,7 @@ export default function TournamentPage() {
             <span className="text-ink-400 mr-1">final tx</span>
             {(t as unknown as { onchainSettledTxHash?: string | null }).onchainSettledTxHash
               ? <span className="font-mono text-ink-900">{(t as unknown as { onchainSettledTxHash?: string }).onchainSettledTxHash!.slice(0, 10)}…{(t as unknown as { onchainSettledTxHash?: string }).onchainSettledTxHash!.slice(-6)}</span>
-              : <span className="text-ink-400">{t.status === 'FINISHED' ? 'pending' : '—'}</span>}
+              : <span className="text-ink-400">{t.status === 'FINISHED' ? 'pending' : '·'}</span>}
           </div>
         </div>
       </div>

@@ -66,7 +66,7 @@ export function MatchSidebar({ socket }: Props) {
       <div className="min-h-[18rem]">
         {tab === 'moves' && (
           <ol className="max-h-72 overflow-y-auto font-mono text-sm text-ink-900 space-y-0.5">
-            {rows.length === 0 && <li className="text-ink-400">—</li>}
+            {rows.length === 0 && <li className="text-ink-400">·</li>}
             {rows.map((r) => (
               <li key={r.n} className="flex gap-3">
                 <span className="w-6 text-right text-ink-400">{r.n}.</span>
@@ -84,7 +84,7 @@ export function MatchSidebar({ socket }: Props) {
         {tab === 'analysis' && <AnalysisPanel />}
       </div>
 
-      {/* Game controls — always visible at the bottom while live */}
+      {/* Game controls · always visible at the bottom while live */}
       {!ended && (
         <div className="flex flex-col gap-2 pt-2 border-t border-parchment-300">
           {drawFromOpponent && (

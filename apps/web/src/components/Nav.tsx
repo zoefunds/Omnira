@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useAuth } from '@/store/auth';
 import { useRouter, usePathname } from 'next/navigation';
 import { disconnectSocket } from '@/lib/socket';
-import { Bell, Settings, Crown } from 'lucide-react';
+import { Settings, Crown } from 'lucide-react';
+import { NotificationsMenu } from '@/components/NotificationsMenu';
 
 const AUTHED_LINKS = [
   { href: '/lobby', label: 'Play' },
@@ -62,18 +63,18 @@ export function Nav() {
         <div className="flex items-center gap-4">
           {user ? (
             <>
-              <button
-                aria-label="Notifications"
-                className="text-ink-600 hover:text-ink-900 transition"
-              >
-                <Bell size={18} strokeWidth={1.5} />
-              </button>
-              <button
+              <NotificationsMenu />
+              <Link
+                href="/settings"
                 aria-label="Settings"
-                className="text-ink-600 hover:text-ink-900 transition"
+                className={`transition ${
+                  isActive('/settings')
+                    ? 'text-gold-600'
+                    : 'text-ink-600 hover:text-ink-900'
+                }`}
               >
                 <Settings size={18} strokeWidth={1.5} />
-              </button>
+              </Link>
               <Link
                 href={`/u/${user.username}`}
                 className="flex items-center gap-2 group"

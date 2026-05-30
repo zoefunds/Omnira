@@ -3,7 +3,7 @@ import './globals.css';
 import { Nav } from '@/components/Nav';
 
 export const metadata: Metadata = {
-  title: 'Omnira — Onchain Chess',
+  title: 'Omnira · Onchain Chess',
   description: 'Master the art of strategy. Onchain chess on GenLayer.',
 };
 

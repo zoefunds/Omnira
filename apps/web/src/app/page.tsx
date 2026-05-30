@@ -13,6 +13,8 @@ import {
   Sparkles,
 } from 'lucide-react';
 
+// Check is still used in the coaching bullet list below.
+
 export default function HomePage() {
   const { user } = useAuth();
 
@@ -40,7 +42,7 @@ export default function HomePage() {
           <p className="mt-6 max-w-2xl mx-auto text-ink-600 leading-relaxed text-lg">
             Join the world&apos;s most elite chess community. Play against top-tier
             opponents, analyze with advanced AI, and learn from legendary
-            Grandmasters — every move recorded onchain.
+            Grandmasters. Every move recorded onchain.
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
             {user ? (
@@ -122,7 +124,7 @@ export default function HomePage() {
                 &ldquo;Chess is the gymnasium of the mind.&rdquo;
               </p>
               <p className="mt-4 text-xs uppercase tracking-[0.3em] text-gold-300">
-                — GM Alexander Vance
+GM Alexander Vance
               </p>
             </div>
           </div>
@@ -163,57 +165,37 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─────────────── PRICING ─────────────── */}
+      {/* ─────────────── HOW IT WORKS ─────────────── */}
       <section className="bg-parchment-100/60 border-y border-parchment-300">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <div className="text-center mb-14">
-            <h2 className="font-serif text-3xl md:text-4xl tracking-wide text-ink-900 uppercase">
-              Choose Your Path
-            </h2>
-            <p className="mt-3 text-sm text-ink-600">
-              Elevate your game with our premium tiers.
+            <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-3">
+              From Sign-Up to Checkmate
             </p>
+            <h2 className="font-serif text-3xl md:text-4xl tracking-wide text-ink-900 uppercase">
+              How It Works
+            </h2>
+            <div className="mt-3 flex justify-center">
+              <span className="gold-rule" />
+            </div>
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <PricingCard
-              tier="Challenger"
-              price="Free"
-              features={[
-                'Unlimited casual games',
-                'Basic engine analysis',
-                'Global leaderboard access',
-              ]}
-              cta="Get Started"
-              ctaHref={user ? '/lobby' : '/signup'}
+            <StepCard
+              step="01"
+              title="Create your account"
+              body="A self-custody GenLayer wallet is derived for you instantly. No seed phrases, no extensions. Your identity follows you across every device."
             />
-            <PricingCard
-              tier="Master"
-              price="$19"
-              period="/month"
-              ribbon="Popular"
+            <StepCard
+              step="02"
+              title="Find your match"
+              body="Pick a time control or accept an open challenge. Our matchmaker pairs you with players near your rating in seconds."
               highlight
-              features={[
-                'Unlimited cloud analysis',
-                'Tournament entry fees waived',
-                'Access to video library',
-                'Custom board themes',
-              ]}
-              cta="Upgrade to Master"
-              ctaHref={user ? '/lobby' : '/signup'}
             />
-            <PricingCard
-              tier="Grandmaster"
-              price="$49"
-              period="/month"
-              features={[
-                '1 monthly session with GM',
-                'VIP tournament access',
-                'Personalized study plans',
-                'Beta access to new tools',
-              ]}
-              cta="Become Elite"
-              ctaHref={user ? '/lobby' : '/signup'}
+            <StepCard
+              step="03"
+              title="Settle onchain"
+              body="When the game ends, the result is committed to GenLayer. Your rating, history, and trophies live forever on-chain."
             />
           </div>
         </div>
@@ -230,7 +212,7 @@ export default function HomePage() {
           <SmallFeat
             icon={<Sparkles size={22} className="text-gold-600" strokeWidth={1.5} />}
             title="Self-custody Wallet"
-            body="A wallet is derived for you at signup — yours across devices."
+            body="A wallet is derived for you at signup. Yours across every device."
           />
           <SmallFeat
             icon={<Trophy size={22} className="text-gold-600" strokeWidth={1.5} />}
@@ -299,71 +281,34 @@ function FeatureCard({
   );
 }
 
-function PricingCard({
-  tier,
-  price,
-  period,
-  features,
-  cta,
-  ctaHref,
+function StepCard({
+  step,
+  title,
+  body,
   highlight = false,
-  ribbon,
 }: {
-  tier: string;
-  price: string;
-  period?: string;
-  features: string[];
-  cta: string;
-  ctaHref: string;
+  step: string;
+  title: string;
+  body: string;
   highlight?: boolean;
-  ribbon?: string;
 }) {
   return (
     <div
-      className={`relative rounded-xl p-7 ${
+      className={`relative rounded-xl p-7 transition ${
         highlight
-          ? 'bg-parchment-50 border border-gold-400 shadow-gold'
-          : 'bg-parchment-50/70 border border-parchment-300'
+          ? 'bg-parchment-50 border border-gold-300 shadow-gold'
+          : 'bg-parchment-50/70 border border-parchment-300 hover:border-gold-300 hover:shadow-card'
       }`}
     >
-      {ribbon && (
-        <span className="absolute -top-3 right-5 rounded-full bg-gold-shine px-3 py-1 text-[10px] font-medium uppercase tracking-wider text-parchment-50 shadow-soft">
-          {ribbon}
-        </span>
-      )}
-      <p
-        className={`text-xs uppercase tracking-[0.25em] ${
-          highlight ? 'text-gold-700' : 'text-ink-400'
+      <div
+        className={`font-serif text-5xl leading-none ${
+          highlight ? 'text-gold-600' : 'text-parchment-500'
         }`}
       >
-        {tier}
-      </p>
-      <div className="mt-3 font-serif text-4xl text-ink-900">
-        {price}
-        {period && (
-          <span className="text-base font-sans font-normal text-ink-400">
-            {period}
-          </span>
-        )}
+        {step}
       </div>
-      <ul className="mt-6 space-y-2 text-sm text-ink-600">
-        {features.map((f) => (
-          <li key={f} className="flex items-start gap-2">
-            <Check size={16} className="text-gold-600 mt-0.5 shrink-0" strokeWidth={2} />
-            <span>{f}</span>
-          </li>
-        ))}
-      </ul>
-      <Link
-        href={ctaHref}
-        className={`mt-7 block text-center rounded-md py-2.5 text-sm font-medium uppercase tracking-wide transition ${
-          highlight
-            ? 'bg-gold-shine text-parchment-50 hover:opacity-90'
-            : 'border border-ink-900 text-ink-900 hover:bg-ink-900 hover:text-parchment-50'
-        }`}
-      >
-        {cta}
-      </Link>
+      <h3 className="mt-4 font-serif text-2xl text-ink-900">{title}</h3>
+      <p className="mt-2 text-sm text-ink-600 leading-relaxed">{body}</p>
     </div>
   );
 }

@@ -16,7 +16,7 @@ html, body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Subtle paper texture overlay — pure CSS, no asset */
+/* Subtle paper texture overlay · pure CSS, no asset */
 body::before {
   content: '';
   position: fixed;

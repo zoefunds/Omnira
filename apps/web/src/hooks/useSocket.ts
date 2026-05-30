@@ -15,7 +15,7 @@ export function useSocket(token: string | null): Socket | null {
     const s = getSocket(token);
     setSocket(s);
     return () => {
-      // don't disconnect — the socket is module-singleton and survives navigation
+      // don't disconnect · the socket is module-singleton and survives navigation
     };
   }, [token]);
 
