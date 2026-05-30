@@ -3,6 +3,7 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import rateLimit from '@fastify/rate-limit';
 import sensible from '@fastify/sensible';
+import helmet from '@fastify/helmet';
 import { env } from './config/env.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerMatchRoutes } from './routes/match.js';
@@ -24,6 +25,7 @@ export async function buildServer() {
   });
 
   await app.register(sensible);
+  await app.register(helmet, { contentSecurityPolicy: false });
   await app.register(cors, { origin: true, credentials: true });
   await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });
   await app.register(jwt, { secret: cfg.JWT_SECRET });

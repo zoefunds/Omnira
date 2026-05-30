@@ -52,14 +52,43 @@ export class ApiError extends Error {
   }
 }
 
+async function attemptRefresh(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('omnira.auth');
+    if (!raw) return null;
+    const { state } = JSON.parse(raw) as { state: { refreshToken?: string | null } };
+    const refreshToken = state?.refreshToken;
+    if (!refreshToken) return null;
+    const r = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    });
+    if (!r.ok) return null;
+    const j = (await r.json()) as { token: string };
+    // Update storage in place; the page's useAuth will rehydrate on next render.
+    const parsed = JSON.parse(raw);
+    parsed.state.token = j.token;
+    localStorage.setItem('omnira.auth', JSON.stringify(parsed));
+    return j.token;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(
   path: string,
-  init: RequestInit & { token?: string } = {},
+  init: RequestInit & { token?: string; _retried?: boolean } = {},
 ): Promise<T> {
   const headers = new Headers(init.headers);
   if (!headers.has('content-type') && init.body) headers.set('content-type', 'application/json');
   if (init.token) headers.set('authorization', `Bearer ${init.token}`);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+  if (res.status === 401 && init.token && !init._retried) {
+    const fresh = await attemptRefresh();
+    if (fresh) return request<T>(path, { ...init, token: fresh, _retried: true });
+  }
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new ApiError(res.status, json?.error ?? 'UNKNOWN', json?.message ?? res.statusText);
   return json as T;
