@@ -37,8 +37,8 @@ export function TournamentActiveMatches({ tournamentId }: Props) {
                 position={m.currentFen ?? undefined}
                 arePiecesDraggable={false}
                 customBoardStyle={{ borderRadius: '0.5rem' }}
-                customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-                customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+                customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+                customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
               />
             </div>
             <div className="mt-2 text-[11px] text-ink-600 leading-tight flex items-baseline justify-between gap-1">

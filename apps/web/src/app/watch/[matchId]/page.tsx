@@ -107,8 +107,8 @@ export default function WatchMatchPage() {
             position={fen ?? undefined}
             arePiecesDraggable={false}
             customBoardStyle={{ borderRadius: '0.875rem' }}
-            customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-            customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+            customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+            customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
           />
         </div>
         <div className="mt-3 rounded-xl border border-parchment-300 bg-parchment-100 px-4 py-2 flex items-baseline justify-between">

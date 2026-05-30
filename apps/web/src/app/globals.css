@@ -7,6 +7,9 @@
 :root {
   --background: #efece4;
   --foreground: #1a1a1a;
+  /* Live-applied by the settings store; classic palette defaults. */
+  --board-light: #f1ecd9;
+  --board-dark:  #a89f7b;
 }
 
 html, body {

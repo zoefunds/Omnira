@@ -90,15 +90,27 @@ export default function LoginPage() {
                 setForm({ ...form, identifier: e.target.value })
               }
             />
-            <Field
-              label="Password"
-              type="password"
-              name="password"
-              autoComplete="current-password"
-              required
-              value={form.password}
-              onChange={(e) => setForm({ ...form, password: e.target.value })}
-            />
+            <div>
+              <Field
+                label="Password"
+                type="password"
+                name="password"
+                autoComplete="current-password"
+                required
+                value={form.password}
+                onChange={(e) =>
+                  setForm({ ...form, password: e.target.value })
+                }
+              />
+              <div className="mt-2 text-right">
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-gold-700 hover:text-gold-600"
+                >
+                  Forgot password?
+                </Link>
+              </div>
+            </div>
             {error && <p className="text-sm text-danger">{error}</p>}
             <button
               type="submit"

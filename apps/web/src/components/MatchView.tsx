@@ -145,8 +145,8 @@ export function MatchView({ socket }: Props) {
             onSquareClick={onSquareClick}
             customSquareStyles={squareStyles}
             customBoardStyle={{ borderRadius: '0.875rem' }}
-            customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-            customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+            customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+            customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
           />
         </div>
         <div className="mt-3">{myClock}</div>

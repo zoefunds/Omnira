@@ -242,8 +242,8 @@ export default function PuzzlesPage() {
               onSquareClick={onSquareClick}
               customSquareStyles={squareStyles}
               customBoardStyle={{ borderRadius: '0.75rem' }}
-              customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-              customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+              customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+              customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
             />
           </div>
           <div className="mt-4 flex items-center justify-between">

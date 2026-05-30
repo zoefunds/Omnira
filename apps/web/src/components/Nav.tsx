@@ -6,18 +6,20 @@ import { useRouter, usePathname } from 'next/navigation';
 import { disconnectSocket } from '@/lib/socket';
 import { Settings, Crown } from 'lucide-react';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
-
-const AUTHED_LINKS = [
-  { href: '/lobby', label: 'Play' },
-  { href: '/puzzles', label: 'Puzzles' },
-  { href: '/tournaments', label: 'Tournaments' },
-  { href: '/watch', label: 'Watch' },
-];
+import { useSettings } from '@/store/settings';
 
 export function Nav() {
   const { user, clear } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const t = useSettings((s) => s.t);
+
+  const AUTHED_LINKS = [
+    { href: '/lobby',       label: t('navPlay') },
+    { href: '/puzzles',     label: t('navPuzzles') },
+    { href: '/tournaments', label: t('navTournaments') },
+    { href: '/watch',       label: t('navWatch') },
+  ];
 
   const isActive = (href: string) =>
     pathname === href || pathname?.startsWith(href + '/');
@@ -92,7 +94,7 @@ export function Nav() {
                 }}
                 className="hidden sm:inline text-sm text-ink-400 hover:text-ink-900 transition"
               >
-                Sign out
+                {t('navSignOut')}
               </button>
             </>
           ) : (
@@ -101,13 +103,13 @@ export function Nav() {
                 href="/login"
                 className="text-sm text-ink-600 hover:text-ink-900 transition"
               >
-                Sign in
+                {t('navSignIn')}
               </Link>
               <Link
                 href="/signup"
                 className="rounded-md bg-gold-shine px-4 py-2 text-sm font-medium text-parchment-50 shadow-soft hover:opacity-90 transition"
               >
-                Join Now
+                {t('navJoinNow')}
               </Link>
             </>
           )}

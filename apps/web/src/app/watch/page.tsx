@@ -170,8 +170,8 @@ export default function WatchPage() {
                   position={m.currentFen ?? undefined}
                   arePiecesDraggable={false}
                   customBoardStyle={{ borderRadius: 0 }}
-                  customDarkSquareStyle={{ backgroundColor: '#a89f7b' }}
-                  customLightSquareStyle={{ backgroundColor: '#f1ecd9' }}
+                  customDarkSquareStyle={{ backgroundColor: 'var(--board-dark)' }}
+                  customLightSquareStyle={{ backgroundColor: 'var(--board-light)' }}
                 />
               </div>
 
