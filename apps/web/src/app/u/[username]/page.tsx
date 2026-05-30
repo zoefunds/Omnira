@@ -120,14 +120,25 @@ export default function ProfilePage() {
 
   if (err)
     return (
-      <div className="max-w-3xl mx-auto px-6 py-20 text-danger text-sm">
-        {err}
+      <div className="max-w-md mx-auto px-6 py-20 text-center">
+        <h1 className="font-serif text-3xl text-ink-900">User not found</h1>
+        <p className="mt-3 text-sm text-ink-600">
+          No Omnira account uses{' '}
+          <span className="font-mono text-ink-900">@{username}</span>. The
+          account may have been deleted, or the link is wrong.
+        </p>
+        <Link
+          href="/lobby"
+          className="mt-6 inline-flex rounded-md bg-gold-shine px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
+        >
+          Back to lobby
+        </Link>
       </div>
     );
   if (!profile)
     return (
       <div className="max-w-3xl mx-auto px-6 py-20 text-ink-600 text-sm">
-        Loading…
+        Loading.
       </div>
     );
 
