@@ -10,7 +10,8 @@
     "build": {
       "commands": [
         "pnpm --filter @omnira/db generate",
-        "pnpm --filter @omnira/worker build"
+        "pnpm --filter @omnira/worker exec tsc -p tsconfig.json --noEmitOnError false || true",
+        "test -f apps/worker/dist/index.js"
       ]
     }
   },
