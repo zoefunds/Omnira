@@ -1,6 +1,8 @@
 import { Chess } from 'chess.js';
 import { prisma, Prisma } from '@omnira/db';
 
+const triedEmpty = new Set<string>();
+
 interface EngineMove {
   ply: number;
   san: string;
@@ -47,8 +49,11 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
   if (!eng?.perMove) return 0;
 
   let created = 0;
+  let bmSeen = 0;
+  let keptForGate = 0;
   for (const m of eng.perMove) {
     if (m.classification !== 'blunder' && m.classification !== 'mistake') continue;
+    bmSeen += 1;
     if (!m.fenBefore || !m.bestMoveUci || m.bestMoveUci === '(none)') continue;
 
     const cpLoss = m.cpLoss ?? 0;
@@ -75,6 +80,7 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
       cpLoss >= 200 ||
       (cpLoss >= 100 && (isCheck || isCapture));
     if (!keep) continue;
+    keptForGate += 1;
 
     const sideToMove = m.fenBefore.split(' ')[1] === 'b' ? 'b' : 'w';
     const themes = ['blunder'];
@@ -110,7 +116,8 @@ export async function generatePuzzlesForMatch(matchId: string): Promise<number> 
       throw e;
     }
   }
-  if (created > 0) log('generated', { matchId, created });
+  log('done', { matchId, plies: eng.perMove.length, bmSeen, keptForGate, created });
+  if (created === 0) triedEmpty.add(matchId);
   return created;
 }
 
@@ -121,6 +128,7 @@ export async function findMatchForPuzzleGen(): Promise<string | null> {
     where: {
       analysis: { is: { llmSummary: { not: '' } } },
       puzzles: { none: {} },
+      ...(triedEmpty.size > 0 ? { id: { notIn: Array.from(triedEmpty) } } : {}),
     },
     orderBy: { endedAt: 'desc' },
     select: { id: true },
