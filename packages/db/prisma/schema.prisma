@@ -38,6 +38,7 @@ model User {
   tournamentParticipations TournamentPlayer[]   @relation("TournamentParticipations")
   puzzleAttempts           PuzzleAttempt[]      @relation("PuzzleAttempts")
   puzzleRating             PuzzleRating?        @relation("PuzzleRating")
+  suspicionFlags           SuspicionFlag[]      @relation("SuspicionFlags")
   challengesAccepted Challenge[]  @relation("ChallengesAccepted")
   chatMessages       ChatMessage[] @relation("ChatMessages")
   sessions      Session[]
@@ -170,6 +171,8 @@ model Match {
   @@index([status, createdAt])
   @@index([whitePlayerId])
   @@index([blackPlayerId])
+  suspicionFlags  SuspicionFlag[]
+
 }
 
 model Move {
@@ -469,5 +472,39 @@ model PuzzleRating {
   solved        Int      @default(0)
   attempted     Int      @default(0)
   updatedAt     DateTime @updatedAt
+}
+
+// ─────────────────────────── ANTI-CHEAT FLAGS ───────────────────────────
+
+enum SuspicionStatus {
+  OPEN
+  REVIEWED_BENIGN
+  REVIEWED_CHEATING
+}
+
+model SuspicionFlag {
+  id              String          @id @default(uuid()) @db.Uuid
+  matchId         String          @db.Uuid
+  match           Match           @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId          String          @db.Uuid
+  user            User            @relation("SuspicionFlags", fields: [userId], references: [id], onDelete: Cascade)
+  color           String          @db.VarChar(1)  // 'w' | 'b'
+
+  pliesAnalyzed   Int
+  avgCpLoss       Float
+  topMovePct      Float           // 0..100
+  ratingGapDelta  Int             // userRatingBefore - opponentRatingBefore (negative = lower rated)
+  themes          String[]        // e.g., ["engine-like-low-cploss", "upset-suspicious"]
+  /// Severity 0..100 — higher = more suspicious.
+  severity        Int
+
+  status          SuspicionStatus @default(OPEN)
+  reviewerNote    String?
+  reviewedAt      DateTime?
+  createdAt       DateTime        @default(now())
+
+  @@unique([matchId, userId])
+  @@index([status, severity(sort: Desc)])
+  @@index([userId, createdAt])
 }
 

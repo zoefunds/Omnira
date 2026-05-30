@@ -4,6 +4,7 @@ import { env } from './env.js';
 import { analyzeOne, workerLog, workerErr } from './analyzeOne.js';
 import { processAlternative, findNextAlternative } from './processAlternative.js';
 import { generatePuzzlesForMatch, findMatchForPuzzleGen } from './generatePuzzles.js';
+import { flagMatchIfSuspicious, findMatchToFlagSafe } from './flagSuspicion.js';
 
 async function findNext(): Promise<string | null> {
   // Matches that have ended, have a PGN, and either lack an AnalysisReport
@@ -53,6 +54,8 @@ async function main() {
     try {
       const altId = await findNextAlternative();
       if (altId) { await processAlternative(altId, sf, cfg.ANALYSIS_DEPTH); continue; }
+      const flagMatch = await findMatchToFlagSafe();
+      if (flagMatch) { try { await flagMatchIfSuspicious(flagMatch); } catch (e) { workerErr('flag step failed', { matchId: flagMatch, err: (e as Error).message }); } }
       const puzMatch = await findMatchForPuzzleGen();
       if (puzMatch) { try { await generatePuzzlesForMatch(puzMatch); } catch (e) { workerErr('puzzle gen failed', { matchId: puzMatch, err: (e as Error).message }); } }
       const id = await findNext();

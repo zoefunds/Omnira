@@ -27,6 +27,7 @@ const EnvSchema = z.object({
     .string()
     .regex(/^0x[a-fA-F0-9]{64}$/)
     .optional(),
+  ADMIN_TOKEN: z.string().min(32).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;
