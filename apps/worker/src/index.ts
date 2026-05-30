@@ -63,18 +63,23 @@ async function main() {
         try {
           await analyzeOne(id, sf);
         } catch (e) {
-          workerErr('analyze failed — stubbing report so loop advances', {
-            matchId: id, err: (e as Error).message,
-          });
-          // Write a stub so this match stops re-appearing. Phase 9B can re-run on demand.
+          const msg = (e as Error).message;
+          workerErr('analyze failed — marking stub so loop advances', { matchId: id, err: msg });
+          // Permanent stub: llmSummary is non-empty so the stale-retry rule (which requires
+          // llmSummary='' AND generatedAt < 10min ago) never matches again.
           await prisma.analysisReport.upsert({
             where: { matchId: id },
-            update: {},
+            update: {
+              engineReport: { error: msg } as object,
+              llmSummary: `ENGINE_ERROR: ${msg}`,
+              llmReport: { error: msg } as object,
+              generatedAt: new Date(),
+            },
             create: {
               matchId: id,
-              engineReport: { error: (e as Error).message } as object,
-              llmSummary: '',
-              llmReport: {} as object,
+              engineReport: { error: msg } as object,
+              llmSummary: `ENGINE_ERROR: ${msg}`,
+              llmReport: { error: msg } as object,
             },
           });
         }
