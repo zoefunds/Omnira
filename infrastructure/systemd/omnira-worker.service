@@ -1,0 +1,30 @@
+[Unit]
+Description=Omnira Worker (Stockfish + GenLayer LLM + puzzles + anti-cheat)
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=omnira
+Group=omnira
+WorkingDirectory=/srv/omnira/apps/worker
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/omnira/.env
+ExecStart=/usr/bin/node --enable-source-maps dist/index.js
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnira-worker
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/omnira /var/log/omnira
+PrivateTmp=yes
+LimitNOFILE=8192
+
+# Stockfish lives under /usr/games/ on Debian — make sure STOCKFISH_PATH in .env is correct.
+
+[Install]
+WantedBy=multi-user.target

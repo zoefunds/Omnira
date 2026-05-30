@@ -1,0 +1,30 @@
+[Unit]
+Description=Omnira API (Fastify + Socket.IO)
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=omnira
+Group=omnira
+WorkingDirectory=/srv/omnira/apps/api
+Environment=NODE_ENV=production
+EnvironmentFile=/srv/omnira/.env
+# Production: `pnpm --filter @omnira/api build` once, then run dist with bare node.
+ExecStart=/usr/bin/node --enable-source-maps dist/server.js
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnira-api
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/omnira /var/log/omnira
+PrivateTmp=yes
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

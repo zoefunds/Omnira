@@ -1,0 +1,29 @@
+[Unit]
+Description=Omnira Web (Next.js)
+After=network.target omnira-api.service
+Requires=omnira-api.service
+
+[Service]
+Type=simple
+User=omnira
+Group=omnira
+WorkingDirectory=/srv/omnira/apps/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+EnvironmentFile=/srv/omnira/.env
+ExecStart=/usr/bin/node node_modules/.bin/next start -p 3000
+Restart=on-failure
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omnira-web
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/srv/omnira
+PrivateTmp=yes
+LimitNOFILE=8192
+
+[Install]
+WantedBy=multi-user.target

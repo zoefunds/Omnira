@@ -33,6 +33,37 @@ export async function buildServer() {
 
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
 
+  // Readiness — verifies downstream deps (DB + Redis). Used by orchestrators.
+  app.get('/health/ready', { config: { rateLimit: false } }, async (_req, reply) => {
+    const checks: Record<string, { ok: boolean; ms?: number; err?: string }> = {};
+    let allOk = true;
+
+    // Postgres
+    const t0 = Date.now();
+    try {
+      const { prisma } = await import('@omnira/db');
+      await prisma.$queryRaw`SELECT 1`;
+      checks.postgres = { ok: true, ms: Date.now() - t0 };
+    } catch (e) {
+      allOk = false;
+      checks.postgres = { ok: false, err: (e as Error).message };
+    }
+
+    // Redis
+    const t1 = Date.now();
+    try {
+      const { redis } = await import('./lib/redis.js');
+      const pong = await redis().ping();
+      if (pong !== 'PONG') throw new Error('unexpected ping reply: ' + pong);
+      checks.redis = { ok: true, ms: Date.now() - t1 };
+    } catch (e) {
+      allOk = false;
+      checks.redis = { ok: false, err: (e as Error).message };
+    }
+
+    return reply.code(allOk ? 200 : 503).send({ ok: allOk, checks, ts: Date.now() });
+  });
+
   await registerAuthRoutes(app);
   await registerMatchRoutes(app);
   await registerChallengeRoutes(app);
