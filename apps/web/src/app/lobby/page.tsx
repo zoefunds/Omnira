@@ -49,9 +49,9 @@ export default function LobbyPage() {
     <div className="flex">
       <PlaySidebar />
 
-      <div className="flex-1 max-w-6xl mx-auto px-6 py-10">
-        <div className="mb-8">
-          <h1 className="font-serif text-4xl text-ink-900">
+      <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 w-full">
+        <div className="mb-6 sm:mb-8">
+          <h1 className="font-serif text-3xl sm:text-4xl text-ink-900">
             Find a Match
           </h1>
           <p className="mt-2 text-sm text-ink-600">
@@ -59,24 +59,24 @@ export default function LobbyPage() {
           </p>
         </div>
 
-        <section className="grid lg:grid-cols-[1fr_1.3fr] gap-8">
+        <section className="grid lg:grid-cols-[1fr_1.3fr] gap-5 sm:gap-8">
           {/* Time controls */}
-          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-6">
-            <h2 className="font-serif text-2xl text-ink-900 mb-4">
+          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-5 sm:p-6">
+            <h2 className="font-serif text-xl sm:text-2xl text-ink-900 mb-4">
               Quick Play
             </h2>
             <TimeControlPills socket={socket} />
           </div>
 
           {/* Open challenges */}
-          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-serif text-2xl text-ink-900">
+          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="font-serif text-xl sm:text-2xl text-ink-900">
                 Open Challenges
               </h2>
               <button
                 onClick={() => setModal(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
+                className="inline-flex items-center gap-1.5 rounded-md bg-gold-shine px-3 sm:px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
               >
                 <Plus size={14} strokeWidth={2} />
                 Create a Game

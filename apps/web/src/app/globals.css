@@ -44,3 +44,13 @@ body::before {
 .heat-2 { background: #d8bd5c; }
 .heat-3 { background: #b8901f; }
 .heat-4 { background: #7a5d14; }
+
+/* Hide native scrollbars on horizontal-scroll strips */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Tap targets on mobile shouldn't tap-highlight ugly */
+button, a { -webkit-tap-highlight-color: transparent; }
+
+/* Prevent horizontal page scroll caused by long unbreakable strings */
+html, body { overflow-x: hidden; }

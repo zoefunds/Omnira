@@ -181,7 +181,7 @@ export default function PuzzlesPage() {
   /* ───── Empty state ───── */
   if (phase === 'empty') {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-10">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <Header stats={stats} />
         <div className="mt-8 rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-16 text-center">
           <div className="mx-auto h-14 w-14 rounded-full bg-gold-shine flex items-center justify-center shadow-soft">
@@ -228,7 +228,7 @@ export default function PuzzlesPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       <Header stats={stats} />
 
       <div className="mt-8 grid lg:grid-cols-[1fr_360px] gap-8 items-start">
@@ -401,7 +401,7 @@ function Header({ stats }: { stats: ApiPuzzleStats | null }) {
         <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-2">
           Daily Tactics
         </p>
-        <h1 className="font-serif text-4xl text-ink-900">Puzzles</h1>
+        <h1 className="font-serif text-3xl sm:text-4xl text-ink-900">Puzzles</h1>
         <p className="mt-2 text-sm text-ink-600">
           Sharpen your pattern recognition with engine-curated positions.
         </p>

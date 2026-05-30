@@ -55,9 +55,9 @@ export default function SettingsPage() {
   ] as const;
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-10 relative">
-      <div className="mb-8">
-        <h1 className="font-serif text-4xl text-ink-900">
+    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 relative">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="font-serif text-3xl sm:text-4xl text-ink-900">
           {settings.t('settingsTitle')}
         </h1>
         <p className="mt-2 text-sm text-ink-600">
@@ -73,34 +73,36 @@ export default function SettingsPage() {
         </div>
       )}
 
-      <div className="grid lg:grid-cols-[240px_1fr] gap-8">
-        {/* Sidebar tabs */}
-        <aside className="space-y-1">
-          {tabs.map((t) => {
-            const Icon = t.icon;
-            const active = tab === t.id;
-            return (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                className={`w-full flex items-center gap-3 rounded-md px-3 py-2.5 text-sm transition text-left ${
-                  active
-                    ? 'bg-gold-shine text-parchment-50 shadow-soft'
-                    : 'text-ink-600 hover:bg-parchment-200/70 hover:text-ink-900'
-                }`}
-              >
-                <Icon size={16} strokeWidth={1.5} />
-                {t.label}
-              </button>
-            );
-          })}
+      <div className="grid lg:grid-cols-[240px_1fr] gap-6 lg:gap-8">
+        {/* Sidebar tabs — horizontal scroll strip on mobile, vertical list on desktop */}
+        <aside className="lg:space-y-1 -mx-4 sm:mx-0 px-4 sm:px-0">
+          <div className="flex lg:flex-col gap-2 lg:gap-1 overflow-x-auto pb-2 lg:pb-0 lg:overflow-visible scrollbar-hide">
+            {tabs.map((t) => {
+              const Icon = t.icon;
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTab(t.id)}
+                  className={`shrink-0 lg:w-full inline-flex items-center gap-2 lg:gap-3 rounded-md px-3 py-2.5 text-sm transition whitespace-nowrap text-left ${
+                    active
+                      ? 'bg-gold-shine text-parchment-50 shadow-soft'
+                      : 'text-ink-600 hover:bg-parchment-200/70 hover:text-ink-900'
+                  }`}
+                >
+                  <Icon size={16} strokeWidth={1.5} />
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
           <button
             onClick={() => {
               disconnectSocket();
               clear();
               router.push('/login');
             }}
-            className="w-full mt-6 flex items-center gap-3 rounded-md px-3 py-2.5 text-sm text-danger hover:bg-danger/10 transition text-left"
+            className="hidden lg:flex w-full mt-6 items-center gap-3 rounded-md px-3 py-2.5 text-sm text-danger hover:bg-danger/10 transition text-left"
           >
             <LogOut size={16} strokeWidth={1.5} />
             {settings.t('navSignOut')}
@@ -108,7 +110,7 @@ export default function SettingsPage() {
         </aside>
 
         {/* Content */}
-        <section className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-8">
+        <section className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-5 sm:p-8">
           {tab === 'account' && (
             <Panel
               title={settings.t('accountTitle')}

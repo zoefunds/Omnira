@@ -7,6 +7,12 @@ export const metadata: Metadata = {
   description: 'Master the art of strategy. Onchain chess on GenLayer.',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#efece4',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">

@@ -71,7 +71,7 @@ export function NotificationsMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-3 w-80 rounded-xl border border-parchment-300 bg-parchment-50 shadow-card z-30 overflow-hidden">
+        <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-16 sm:top-auto sm:mt-3 sm:w-80 rounded-xl border border-parchment-300 bg-parchment-50 shadow-card z-30 overflow-hidden">
           <div className="px-4 py-3 flex items-center justify-between border-b border-parchment-300">
             <span className="font-serif text-lg text-ink-900">Notifications</span>
             <button

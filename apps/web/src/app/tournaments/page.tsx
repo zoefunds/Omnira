@@ -84,14 +84,14 @@ export default function TournamentsPage() {
   if (!user) return null;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-2">
             Compete on the Arena
           </p>
-          <h1 className="font-serif text-4xl text-ink-900">Tournaments</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl text-ink-900">Tournaments</h1>
           <p className="mt-2 text-sm text-ink-600">
             Arena format with continuous pairing. Climb the standings and settle
             your finish onchain.

@@ -67,14 +67,14 @@ export default function WatchPage() {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-10">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-2">
             Live Spectator
           </p>
-          <h1 className="font-serif text-4xl text-ink-900">Watch</h1>
+          <h1 className="font-serif text-3xl sm:text-4xl text-ink-900">Watch</h1>
           <p className="mt-2 text-sm text-ink-600 flex items-center gap-2">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold-500 opacity-60" />
