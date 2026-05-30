@@ -291,3 +291,37 @@ api.listActiveSiteMatches = () =>
 api.getMatchState = (matchId: string) =>
   request<{ match: ApiMatchState }>(`/match/${matchId}`, { method: 'GET' });
 
+// ────────── Puzzles ──────────
+
+export interface ApiPuzzle {
+  id: string;
+  fen: string;
+  sideToMove: 'w' | 'b';
+  themes: string[];
+  rating: number;
+}
+
+export interface ApiPuzzleAttemptResponse {
+  result: 'CORRECT' | 'WRONG' | 'SKIPPED';
+  solutionUci: string;
+  solutionSan: string;
+  userRating: number;
+  puzzleRating: number;
+}
+
+export interface ApiPuzzleStats {
+  rating: number;
+  ratingDev: number;
+  solved: number;
+  attempted: number;
+}
+
+api.getNextPuzzle = (token: string) => request<{ puzzle: ApiPuzzle } | null>('/puzzles/next', { method: 'GET', token });
+api.submitPuzzleAttempt = (body: {
+  puzzleId: string;
+  submittedUci?: string;
+  result: 'CORRECT' | 'WRONG' | 'SKIPPED';
+  thinkMs: number;
+}, token: string) => request<ApiPuzzleAttemptResponse>('/puzzles/attempt', { method: 'POST', token, body: JSON.stringify(body) });
+api.getPuzzleStats = (username: string) => request<{ stats: ApiPuzzleStats | null }>(`/puzzles/stats/${username}`, { method: 'GET' });
+

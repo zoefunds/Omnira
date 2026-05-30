@@ -12,6 +12,7 @@ import { registerAnalysisRoutes } from './routes/analysis.js';
 import { registerAlternativeRoutes } from './routes/alternatives.js';
 import { registerTournamentRoutes } from './routes/tournaments.js';
 import { registerUserRoutes } from './routes/users.js';
+import { registerPuzzleRoutes } from './routes/puzzles.js';
 import { attachRealtime } from './realtime/socket.js';
 import { spawnMatch } from './match/runtime.js';
 import { startTournamentRuntime } from './tournaments/runtime.js';
@@ -37,6 +38,7 @@ export async function buildServer() {
   await registerAlternativeRoutes(app);
   await registerTournamentRoutes(app);
   await registerUserRoutes(app);
+  await registerPuzzleRoutes(app);
 
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();

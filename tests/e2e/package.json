@@ -1,0 +1,16 @@
+{
+  "name": "@omnira/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "dotenv -e ../../.env -- playwright test",
+    "test:headed": "dotenv -e ../../.env -- playwright test --headed",
+    "test:debug": "dotenv -e ../../.env -- playwright test --debug",
+    "install:browsers": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "typescript": "^5.6.3"
+  }
+}

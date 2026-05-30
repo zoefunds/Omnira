@@ -36,6 +36,8 @@ model User {
   tournamentsCreated     Tournament[]           @relation("TournamentsCreated")
   tournamentsWon         Tournament[]           @relation("TournamentsWon")
   tournamentParticipations TournamentPlayer[]   @relation("TournamentParticipations")
+  puzzleAttempts           PuzzleAttempt[]      @relation("PuzzleAttempts")
+  puzzleRating             PuzzleRating?        @relation("PuzzleRating")
   challengesAccepted Challenge[]  @relation("ChallengesAccepted")
   chatMessages       ChatMessage[] @relation("ChatMessages")
   sessions      Session[]
@@ -161,6 +163,7 @@ model Match {
   chat            ChatMessage[]
   challenge       Challenge?
   alternatives    Alternative[]
+  puzzles         Puzzle[]
   tournamentId    String?      @db.Uuid
   tournament      Tournament?  @relation(fields: [tournamentId], references: [id], onDelete: SetNull)
 
@@ -389,5 +392,82 @@ model TournamentPlayer {
 
   @@unique([tournamentId, userId])
   @@index([tournamentId, score(sort: Desc), wins(sort: Desc)])
+}
+
+// ─────────────────────────── PUZZLES ───────────────────────────
+
+enum PuzzleAttemptResult {
+  CORRECT
+  WRONG
+  SKIPPED
+}
+
+model Puzzle {
+  id              String          @id @default(uuid()) @db.Uuid
+  /// FEN of the position the user must solve.
+  fen             String
+  /// Whose move (parity from FEN, denormalized for cheap query).
+  sideToMove      String          @db.VarChar(1)  // "w" | "b"
+  /// Single-move solution (UCI). v2 may extend to multi-move PV.
+  solutionUci     String
+  /// SAN of the solution for display.
+  solutionSan     String
+  /// Stockfish eval of the position (mover POV cp; null if mate).
+  evalCp          Int?
+  evalMate        Int?
+  /// What was actually played in the source game (the blunder).
+  playedUci       String?
+  playedSan       String?
+  /// Centipawn-loss of the original blunder (severity heuristic).
+  cpLoss          Int?
+  /// Free-form tags: "blunder", "mate-in-1", "winning-material", "in-check"
+  themes          String[]
+  /// Glicko-lite rating; defaults to a midrange.
+  rating          Int             @default(1500)
+  ratingDev       Int             @default(350)
+  attempts        Int             @default(0)
+  solved          Int             @default(0)
+  /// Where it came from — for credit / curation.
+  sourceMatchId   String?         @db.Uuid
+  sourceMatch     Match?          @relation(fields: [sourceMatchId], references: [id], onDelete: SetNull)
+  sourcePly       Int?
+  createdAt       DateTime        @default(now())
+  publishedAt     DateTime?
+  records         PuzzleAttempt[]
+
+  @@index([rating])
+  @@index([publishedAt])
+  @@unique([sourceMatchId, sourcePly])
+}
+
+model PuzzleAttempt {
+  id            String              @id @default(uuid()) @db.Uuid
+  puzzleId      String              @db.Uuid
+  puzzle        Puzzle              @relation(fields: [puzzleId], references: [id], onDelete: Cascade)
+  userId        String              @db.Uuid
+  user          User                @relation("PuzzleAttempts", fields: [userId], references: [id], onDelete: Cascade)
+  result        PuzzleAttemptResult
+  /// What the user submitted (UCI) — for analytics + replay.
+  submittedUci  String?
+  /// Rating snapshot AFTER this attempt.
+  userRatingAfter   Int
+  puzzleRatingAfter Int
+  /// Milliseconds spent on this attempt.
+  thinkMs       Int                 @default(0)
+  createdAt     DateTime            @default(now())
+
+  @@index([userId, createdAt])
+  @@index([puzzleId, createdAt])
+}
+
+model PuzzleRating {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @unique @db.Uuid
+  user          User     @relation("PuzzleRating", fields: [userId], references: [id], onDelete: Cascade)
+  rating        Int      @default(1500)
+  ratingDev     Int      @default(350)
+  solved        Int      @default(0)
+  attempted     Int      @default(0)
+  updatedAt     DateTime @updatedAt
 }
 
