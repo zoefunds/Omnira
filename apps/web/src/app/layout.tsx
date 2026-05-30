@@ -3,8 +3,8 @@ import './globals.css';
 import { Nav } from '@/components/Nav';
 
 export const metadata: Metadata = {
-  title: 'Omnira',
-  description: 'Onchain chess on GenLayer',
+  title: 'Omnira — Onchain Chess',
+  description: 'Master the art of strategy. Onchain chess on GenLayer.',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -12,7 +12,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en">
       <body className="min-h-screen">
         <Nav />
-        <main className="relative z-10 max-w-6xl mx-auto px-6 py-10">{children}</main>
+        <main className="relative z-10">{children}</main>
       </body>
     </html>
   );

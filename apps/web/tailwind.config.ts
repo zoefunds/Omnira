@@ -5,7 +5,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Omnira surface
+        // Omnira surface — parchment cream, brand base
         parchment: {
           DEFAULT: '#efece4',
           50:  '#fbfaf6',
@@ -24,9 +24,25 @@ const config: Config = {
           600: '#404040',
           900: '#171717',
         },
+        // Primary accent — warm gold, evokes engraved chess clocks
+        gold: {
+          DEFAULT: '#b8901f',
+          50:  '#fbf6e6',
+          100: '#f3e7b8',
+          200: '#e8d488',
+          300: '#d8bd5c',
+          400: '#c5a637',
+          500: '#b8901f',
+          600: '#9a771a',
+          700: '#7a5d14',
+          800: '#5a440f',
+        },
         accent: {
-          DEFAULT: '#2f6b4f', // muted forest green for primary action
-          hover:   '#244f3a',
+          DEFAULT: '#b8901f', // alias of gold for compatibility
+          hover:   '#9a771a',
+        },
+        success: {
+          DEFAULT: '#2f6b4f',
         },
         danger: {
           DEFAULT: '#a13a2e',
@@ -39,7 +55,7 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['ui-sans-serif', 'system-ui', '-apple-system', 'Inter', 'sans-serif'],
-        serif: ['ui-serif', 'Georgia', 'serif'],
+        serif: ['"Cormorant Garamond"', 'ui-serif', 'Georgia', 'serif'],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       borderRadius: {
@@ -47,6 +63,11 @@ const config: Config = {
       },
       boxShadow: {
         soft: '0 1px 2px rgba(26,26,26,.04), 0 4px 16px rgba(26,26,26,.06)',
+        card: '0 1px 0 rgba(184,144,31,.08), 0 6px 24px rgba(26,26,26,.05)',
+        gold: '0 0 0 1px rgba(184,144,31,.25), 0 4px 14px rgba(184,144,31,.15)',
+      },
+      backgroundImage: {
+        'gold-shine': 'linear-gradient(135deg, #d8bd5c 0%, #b8901f 50%, #9a771a 100%)',
       },
     },
   },

@@ -7,6 +7,7 @@ import { useMatch } from '@/store/match';
 import { useSocket } from '@/hooks/useSocket';
 // /play now only renders the active match; the matchmaking lobby lives at /lobby.
 import { MatchView } from '@/components/MatchView';
+import { PlaySidebar } from '@/components/PlaySidebar';
 
 export default function PlayPage() {
   const router = useRouter();
@@ -71,15 +72,19 @@ export default function PlayPage() {
   const hasResult = !!m.matchId && !!m.ended;
 
   return (
-    <section className="space-y-8">
-      {!inMatch && !hasResult && <RedirectToLobby />}
-      {(inMatch || hasResult) && <MatchView socket={socket} />}
+    <div className="flex">
+      <PlaySidebar />
 
-      <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-4 max-w-md text-xs text-ink-400">
-        <span>Wallet </span>
-        <span className="font-mono text-ink-600">{user.walletAddress}</span>
+      <div className="flex-1 max-w-6xl mx-auto px-6 py-10 space-y-8">
+        {!inMatch && !hasResult && <RedirectToLobby />}
+        {(inMatch || hasResult) && <MatchView socket={socket} />}
+
+        <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 p-4 max-w-md text-xs text-ink-400 shadow-card">
+          <span>Wallet </span>
+          <span className="font-mono text-ink-600">{user.walletAddress}</span>
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
