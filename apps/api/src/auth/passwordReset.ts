@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { prisma } from '@omnira/db';
 import { hashPassword } from './password.js';
-import { sendEmail } from '../email/resend.js';
+import { sendEmail } from '../email/brevo.js';
 import { env } from '../config/env.js';
 import { revokeAllForUser } from './sessions.js';
 

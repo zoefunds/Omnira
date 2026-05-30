@@ -29,9 +29,9 @@ const EnvSchema = z.object({
     .optional(),
   ADMIN_TOKEN: z.string().min(32).optional(),
 
-  // Password reset email
-  RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().default('Omnira <onboarding@resend.dev>'),
+  // Password reset email (Brevo)
+  BREVO_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().default('Omnira <noreply@omnira.app>'),
   WEB_BASE_URL: z.string().url().default('https://omnira-blond.vercel.app'),
 });
 
