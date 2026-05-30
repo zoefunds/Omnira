@@ -11,6 +11,8 @@ import {
   LANG_LABEL,
 } from '@/store/settings';
 import { UserAvatar } from '@/components/UserAvatar';
+import { ExportWalletModal } from '@/components/ExportWalletModal';
+import { KeyRound } from 'lucide-react';
 import {
   User,
   Wallet,
@@ -31,6 +33,7 @@ export default function SettingsPage() {
     'account' | 'wallet' | 'notifications' | 'security' | 'appearance' | 'language'
   >('account');
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -137,6 +140,30 @@ export default function SettingsPage() {
                 Your wallet address is permanent and travels with your account.
                 Every game you finish is settled to this address on GenLayer.
               </div>
+
+              <div className="rounded-md border border-gold-300 bg-parchment-50 p-4 mt-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-md bg-gold-shine flex items-center justify-center text-parchment-50 shrink-0">
+                    <KeyRound size={16} strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-ink-900">
+                      Export private key
+                    </div>
+                    <p className="text-xs text-ink-600 mt-1 leading-relaxed">
+                      Reveal the private key for your wallet so you can import
+                      it into MetaMask, Rabby, or another EVM wallet. Requires
+                      your password.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setExportOpen(true)}
+                    className="rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition shrink-0"
+                  >
+                    Export
+                  </button>
+                </div>
+              </div>
             </Panel>
           )}
 
@@ -222,6 +249,10 @@ export default function SettingsPage() {
           )}
         </section>
       </div>
+
+      {exportOpen && (
+        <ExportWalletModal onClose={() => setExportOpen(false)} />
+      )}
     </div>
   );
 }

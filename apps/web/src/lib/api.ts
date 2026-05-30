@@ -135,6 +135,17 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  exportWallet(body: { password: string }, token: string) {
+    return request<{
+      address: string;
+      privateKey: string;
+      derivationVersion: string;
+    }>('/me/wallet/export', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(body),
+    });
+  },
   listChallenges() {
     return request<{ challenges: ApiChallenge[] }>('/challenges', { method: 'GET' });
   },
