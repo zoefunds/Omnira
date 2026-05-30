@@ -10,8 +10,12 @@
     "build": {
       "commands": [
         "pnpm --filter @omnira/db generate",
+        "pnpm --filter @omnira/db exec tsc -p tsconfig.json --noEmitOnError false || true",
+        "pnpm --filter @omnira/chess-engine exec tsc -p tsconfig.json --noEmitOnError false || true",
         "pnpm --filter @omnira/worker exec tsc -p tsconfig.json --noEmitOnError false || true",
-        "test -f apps/worker/dist/index.js"
+        "test -f apps/worker/dist/index.js",
+        "test -f packages/db/dist/index.js",
+        "test -f packages/chess-engine/dist/index.js"
       ]
     }
   },
