@@ -6,11 +6,11 @@ import { useAuth } from '@/store/auth';
 import {
   useSettings,
   type Language,
-  type Theme,
   type BoardStyle,
   type PieceSet,
   LANG_LABEL,
 } from '@/store/settings';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   User,
   Wallet,
@@ -114,6 +114,7 @@ export default function SettingsPage() {
               title={settings.t('accountTitle')}
               description="Your public profile and basic information."
             >
+              <AvatarRow userId={user.id} username={user.username} onChange={flash} />
               <Row label="Username" value={user.username} hint="Visible to other players." />
               <Row label="Email" value={user.email} hint="Used to sign in." />
               <Row
@@ -169,19 +170,6 @@ export default function SettingsPage() {
               title={settings.t('appearanceTitle')}
               description={settings.t('appearanceBlurb')}
             >
-              <Choice<Theme>
-                label={settings.t('themeLabel')}
-                value={settings.theme}
-                options={[
-                  { value: 'parchment', label: 'Parchment' },
-                  { value: 'ink',       label: 'Ink' },
-                  { value: 'system',    label: 'System' },
-                ]}
-                onChange={(v) => {
-                  settings.setTheme(v);
-                  flash();
-                }}
-              />
               <Choice<BoardStyle>
                 label={settings.t('boardLabel')}
                 value={settings.board}
@@ -323,6 +311,95 @@ function Toggle({
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+function AvatarRow({
+  userId,
+  username,
+  onChange,
+}: {
+  userId: string;
+  username: string;
+  onChange: () => void;
+}) {
+  const { avatars, setAvatar, clearAvatar } = useSettings();
+  const current = avatars[userId];
+
+  function onPick(file: File) {
+    if (!file.type.startsWith('image/')) {
+      alert('Please choose an image file.');
+      return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Image must be under 2 MB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      // Resize to 256x256 max to keep localStorage small.
+      const img = new Image();
+      img.onload = () => {
+        const max = 256;
+        const scale = Math.min(max / img.width, max / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          setAvatar(userId, dataUrl);
+        } else {
+          ctx.drawImage(img, 0, 0, w, h);
+          setAvatar(userId, canvas.toDataURL('image/jpeg', 0.85));
+        }
+        onChange();
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-parchment-300/70">
+      <div className="flex items-center gap-4">
+        <UserAvatar userId={userId} username={username} size={64} />
+        <div>
+          <div className="text-sm font-medium text-ink-900">Profile picture</div>
+          <div className="text-xs text-ink-400 mt-0.5">
+            Shown in the nav bar and on your profile.
+          </div>
+        </div>
+      </div>
+      <div className="flex gap-2">
+        <label className="rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition cursor-pointer">
+          Upload
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) onPick(f);
+              e.target.value = '';
+            }}
+          />
+        </label>
+        {current && (
+          <button
+            onClick={() => {
+              clearAvatar(userId);
+              onChange();
+            }}
+            className="rounded-md border border-parchment-400 px-4 py-2 text-xs text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
+          >
+            Remove
+          </button>
+        )}
+      </div>
     </div>
   );
 }

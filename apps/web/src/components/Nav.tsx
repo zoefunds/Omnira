@@ -7,6 +7,7 @@ import { disconnectSocket } from '@/lib/socket';
 import { Settings, Crown } from 'lucide-react';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 import { useSettings } from '@/store/settings';
+import { UserAvatar } from '@/components/UserAvatar';
 
 export function Nav() {
   const { user, clear } = useAuth();
@@ -82,9 +83,11 @@ export function Nav() {
                 className="flex items-center gap-2 group"
                 title={user.walletAddress}
               >
-                <div className="h-9 w-9 rounded-full bg-gold-shine flex items-center justify-center text-parchment-50 font-serif text-sm shadow-soft ring-1 ring-gold-700/30">
-                  {user.username.slice(0, 1).toUpperCase()}
-                </div>
+                <UserAvatar
+                  userId={user.id}
+                  username={user.username}
+                  size={36}
+                />
               </Link>
               <button
                 onClick={() => {

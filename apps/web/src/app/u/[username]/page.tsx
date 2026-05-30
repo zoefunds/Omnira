@@ -11,6 +11,7 @@ import {
   type ApiAnalyzedMatch,
 } from '@/lib/api';
 import { Sparkline } from '@/components/Sparkline';
+import { UserAvatar } from '@/components/UserAvatar';
 import {
   Timer,
   Zap,
@@ -23,6 +24,9 @@ import {
   Crown,
   UserPlus,
   Swords,
+  ArrowUpRight,
+  X,
+  Sparkles,
 } from 'lucide-react';
 
 function fmtTC(initialSec: number, incrementSec: number) {
@@ -71,6 +75,9 @@ export default function ProfilePage() {
     attempted: number;
   } | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openAnalysis, setOpenAnalysis] = useState<ApiAnalyzedMatch | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -147,9 +154,10 @@ export default function ProfilePage() {
         <div className="flex flex-col md:flex-row md:items-center gap-6">
           {/* Avatar */}
           <div className="relative shrink-0">
-            <div className="h-28 w-28 md:h-32 md:w-32 rounded-xl bg-gold-shine flex items-center justify-center text-parchment-50 font-serif text-5xl shadow-card ring-1 ring-gold-700/30">
-              {profile.username.slice(0, 1).toUpperCase()}
-            </div>
+            <ProfileAvatar
+              userId={profile.id}
+              username={profile.username}
+            />
             <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-gold-shine px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-parchment-50 shadow-soft">
               Player
             </span>
@@ -482,18 +490,14 @@ export default function ProfilePage() {
               const isWhite = a.whitePlayer.id === profile.id;
               const opp = isWhite ? a.blackPlayer : a.whitePlayer;
               return (
-                <div
+                <button
                   key={a.id}
-                  className="rounded-xl border border-parchment-300 bg-parchment-100/60 p-4 shadow-card"
+                  onClick={() => setOpenAnalysis(a)}
+                  className="text-left rounded-xl border border-parchment-300 bg-parchment-100/60 p-4 shadow-card hover:border-gold-300 hover:shadow-gold transition"
                 >
                   <div className="text-xs text-ink-400 mb-2">
                     vs{' '}
-                    <Link
-                      href={`/u/${opp.username}`}
-                      className="text-ink-900 hover:text-gold-700"
-                    >
-                      {opp.username}
-                    </Link>
+                    <span className="text-ink-900">{opp.username}</span>
                     <span className="mx-2">·</span>
                     {a.category.toLowerCase()}
                     <span className="mx-2">·</span>
@@ -502,17 +506,142 @@ export default function ProfilePage() {
                   <p className="text-sm text-ink-900 leading-snug line-clamp-3">
                     {a.analysis.llmSummary}
                   </p>
-                </div>
+                  <div className="mt-3 inline-flex items-center gap-1 text-[11px] uppercase tracking-wider text-gold-700">
+                    Read full analysis
+                    <ArrowUpRight size={12} strokeWidth={2} />
+                  </div>
+                </button>
               );
             })}
           </div>
         </section>
+      )}
+
+      {openAnalysis && (
+        <AnalysisModal
+          a={openAnalysis}
+          profileId={profile.id}
+          onClose={() => setOpenAnalysis(null)}
+        />
       )}
     </div>
   );
 }
 
 /* ─────────────────── helpers ─────────────────── */
+
+function AnalysisModal({
+  a,
+  profileId,
+  onClose,
+}: {
+  a: ApiAnalyzedMatch;
+  profileId: string;
+  onClose: () => void;
+}) {
+  const isWhite = a.whitePlayer.id === profileId;
+  const opp = isWhite ? a.blackPlayer : a.whitePlayer;
+  const result =
+    a.status === 'DRAW'
+      ? 'Draw'
+      : (a.status === 'WHITE_WON' && isWhite) ||
+        (a.status === 'BLACK_WON' && !isWhite)
+      ? 'Win'
+      : 'Loss';
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-ink-900/40 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-parchment-50 border border-parchment-300 rounded-xl shadow-card w-full max-w-2xl max-h-[85vh] overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-parchment-300 flex items-start justify-between gap-4">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.25em] text-gold-700">
+              <Sparkles size={14} strokeWidth={1.5} />
+              AI Coaching Report
+            </div>
+            <h2 className="mt-2 font-serif text-2xl text-ink-900">
+              vs {opp.username}
+            </h2>
+            <p className="mt-1 text-sm text-ink-600">
+              {isWhite ? 'Played as White' : 'Played as Black'}
+              <span className="mx-2 text-ink-400">·</span>
+              {a.category.toLowerCase()}
+              <span className="mx-2 text-ink-400">·</span>
+              {a.endedAt && new Date(a.endedAt).toLocaleString()}
+              <span className="mx-2 text-ink-400">·</span>
+              <span
+                className={
+                  result === 'Win'
+                    ? 'text-gold-700 font-medium'
+                    : result === 'Loss'
+                    ? 'text-danger font-medium'
+                    : 'text-ink-600 font-medium'
+                }
+              >
+                {result}
+              </span>
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="text-ink-400 hover:text-ink-900 transition shrink-0"
+          >
+            <X size={20} strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5 overflow-y-auto">
+          <article className="prose-omnira max-w-none text-ink-900 text-sm leading-relaxed whitespace-pre-wrap">
+            {a.analysis.llmSummary}
+          </article>
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-parchment-300 bg-parchment-100/60 flex items-center justify-end gap-2">
+          <Link
+            href={`/watch/${a.id}`}
+            className="rounded-md border border-parchment-400 px-4 py-2 text-xs font-medium uppercase tracking-wide text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
+          >
+            View board
+          </Link>
+          <button
+            onClick={onClose}
+            className="rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileAvatar({
+  userId,
+  username,
+}: {
+  userId: string;
+  username: string;
+}) {
+  return (
+    <div className="h-28 w-28 md:h-32 md:w-32 rounded-xl overflow-hidden ring-1 ring-gold-700/30 shadow-card bg-gold-shine flex items-center justify-center">
+      <UserAvatar
+        userId={userId}
+        username={username}
+        size={128}
+        className="!rounded-xl !ring-0 !shadow-none"
+      />
+    </div>
+  );
+}
 
 function topRating(ratings: ApiProfile['ratings']) {
   if (!ratings.length) return 'N/A';

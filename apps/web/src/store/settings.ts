@@ -6,7 +6,6 @@ import { persist } from 'zustand/middleware';
 /* ─────────────────── Types ─────────────────── */
 
 export type Language = 'en' | 'es' | 'fr' | 'de';
-export type Theme = 'parchment' | 'ink' | 'system';
 export type BoardStyle = 'classic' | 'walnut' | 'marble';
 export type PieceSet = 'engraved' | 'modern' | 'minimal';
 
@@ -147,13 +146,15 @@ const I18N: Record<Language, Strings> = {
 
 interface SettingsState {
   language: Language;
-  theme: Theme;
   board: BoardStyle;
   pieceSet: PieceSet;
+  /** base64 data-URL of uploaded avatar, keyed by userId */
+  avatars: Record<string, string>;
   setLanguage: (l: Language) => void;
-  setTheme: (t: Theme) => void;
   setBoard: (b: BoardStyle) => void;
   setPieceSet: (p: PieceSet) => void;
+  setAvatar: (userId: string, dataUrl: string) => void;
+  clearAvatar: (userId: string) => void;
   t: (key: keyof Strings) => string;
 }
 
@@ -161,24 +162,28 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set, get) => ({
       language: 'en',
-      theme: 'parchment',
-      board: 'classic',
-      pieceSet: 'engraved',
+      board: 'walnut',
+      pieceSet: 'modern',
+      avatars: {},
       setLanguage: (language) => {
         set({ language });
         if (typeof document !== 'undefined') {
           document.documentElement.lang = language;
         }
       },
-      setTheme: (theme) => {
-        set({ theme });
-        applyTheme(theme);
-      },
       setBoard: (board) => {
         set({ board });
         applyBoard(board);
       },
       setPieceSet: (pieceSet) => set({ pieceSet }),
+      setAvatar: (userId, dataUrl) =>
+        set((s) => ({ avatars: { ...s.avatars, [userId]: dataUrl } })),
+      clearAvatar: (userId) =>
+        set((s) => {
+          const next = { ...s.avatars };
+          delete next[userId];
+          return { avatars: next };
+        }),
       t: (key) => I18N[get().language][key] ?? I18N.en[key],
     }),
     {
@@ -186,31 +191,13 @@ export const useSettings = create<SettingsState>()(
       onRehydrateStorage: () => (state) => {
         if (typeof window === 'undefined' || !state) return;
         document.documentElement.lang = state.language;
-        applyTheme(state.theme);
         applyBoard(state.board);
       },
     },
   ),
 );
 
-function applyTheme(theme: Theme) {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  root.dataset.theme = theme;
-  const resolved =
-    theme === 'system'
-      ? window.matchMedia('(prefers-color-scheme: dark)').matches
-        ? 'ink'
-        : 'parchment'
-      : theme;
-  if (resolved === 'ink') {
-    document.body.style.background = '#1a1a1a';
-    document.body.style.color = '#efece4';
-  } else {
-    document.body.style.background = '#efece4';
-    document.body.style.color = '#1a1a1a';
-  }
-}
+// Light theme only — base palette lives in globals.css.
 
 function applyBoard(board: BoardStyle) {
   if (typeof document === 'undefined') return;
