@@ -9,6 +9,7 @@ import { Settings, Crown, Menu, X, LogIn, UserPlus } from 'lucide-react';
 import { NotificationsMenu } from '@/components/NotificationsMenu';
 import { useSettings } from '@/store/settings';
 import { UserAvatar } from '@/components/UserAvatar';
+import { useFocusTrap } from '@/lib/focusTrap';
 
 export function Nav() {
   const { user, clear } = useAuth();
@@ -16,6 +17,7 @@ export function Nav() {
   const pathname = usePathname();
   const t = useSettings((s) => s.t);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const drawerRef = useFocusTrap<HTMLDivElement>(mobileOpen);
 
   const AUTHED_LINKS = [
     { href: '/lobby',       label: t('navPlay') },
@@ -32,12 +34,17 @@ export function Nav() {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Lock body scroll while the drawer is open
+  // Lock body scroll + close on Escape while the drawer is open
   useEffect(() => {
     if (mobileOpen) {
       document.body.style.overflow = 'hidden';
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') setMobileOpen(false);
+      };
+      document.addEventListener('keydown', onKey);
       return () => {
         document.body.style.overflow = '';
+        document.removeEventListener('keydown', onKey);
       };
     }
   }, [mobileOpen]);
@@ -162,6 +169,10 @@ export function Nav() {
             aria-hidden
           />
           <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile menu"
             className="md:hidden fixed inset-x-0 top-16 bottom-0 z-[70] bg-parchment-200 overflow-y-auto animate-in fade-in slide-in-from-top-2"
             onClick={() => setMobileOpen(false)}
           >

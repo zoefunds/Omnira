@@ -21,9 +21,32 @@ function safeNext(raw: string | null): string {
 
 export default function SignupRoute() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<AuthSkeleton title="Join the lounge" eyebrow="Create Account" />}>
       <SignupPage />
     </Suspense>
+  );
+}
+
+function AuthSkeleton({ title, eyebrow }: { title: string; eyebrow: string }) {
+  return (
+    <div className="min-h-[calc(100vh-64px)] grid lg:grid-cols-2">
+      <div className="hidden lg:block bg-parchment-100/60 border-r border-parchment-300" />
+      <main className="flex items-center justify-center p-6 lg:p-12">
+        <div className="w-full max-w-md animate-pulse">
+          <p className="text-xs uppercase tracking-[0.3em] text-gold-700 mb-2">
+            {eyebrow}
+          </p>
+          <h1 className="font-serif text-4xl text-ink-900">{title}</h1>
+          <div className="mt-2 h-4 w-2/3 rounded bg-parchment-300/70" />
+          <div className="mt-8 space-y-4">
+            <div className="h-10 rounded-md bg-parchment-200" />
+            <div className="h-10 rounded-md bg-parchment-200" />
+            <div className="h-10 rounded-md bg-parchment-200" />
+            <div className="h-12 rounded-md bg-parchment-300" />
+          </div>
+        </div>
+      </main>
+    </div>
   );
 }
 

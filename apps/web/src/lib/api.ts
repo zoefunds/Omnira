@@ -53,20 +53,40 @@ export class ApiError extends Error {
   }
 }
 
+/** Broadcast that the session has been invalidated (refresh failed or token
+ *  is no longer valid). Listeners (AuthGuard, individual pages) can wipe
+ *  local state and bounce to /login. */
+function emitSessionExpired() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent('omnira:session-expired'));
+}
+
 async function attemptRefresh(): Promise<string | null> {
   if (typeof window === 'undefined') return null;
   try {
     const raw = localStorage.getItem('omnira.auth');
-    if (!raw) return null;
+    if (!raw) {
+      emitSessionExpired();
+      return null;
+    }
     const { state } = JSON.parse(raw) as { state: { refreshToken?: string | null } };
     const refreshToken = state?.refreshToken;
-    if (!refreshToken) return null;
+    if (!refreshToken) {
+      emitSessionExpired();
+      return null;
+    }
     const r = await fetch(`${API_BASE}/auth/refresh`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ refreshToken }),
     });
-    if (!r.ok) return null;
+    if (!r.ok) {
+      // 401/410 — refresh token revoked or expired; force user to log in again.
+      if (r.status === 401 || r.status === 410 || r.status === 403) {
+        emitSessionExpired();
+      }
+      return null;
+    }
     const j = (await r.json()) as { token: string };
     // Update storage in place.
     const parsed = JSON.parse(raw);
@@ -82,6 +102,8 @@ async function attemptRefresh(): Promise<string | null> {
     }
     return j.token;
   } catch {
+    // Network failure during refresh — don't kill the session, the next
+    // call will retry. Only treat explicit server rejections as expired.
     return null;
   }
 }
@@ -377,8 +399,24 @@ export interface ApiMatchState {
   moves: Array<{ ply: number; san: string; uci: string; fenAfter: string; clockMsWhite: number; clockMsBlack: number }>;
 }
 
-api.listActiveSiteMatches = () =>
-  request<{ matches: ApiSiteActiveMatch[] }>(`/matches/active`, { method: 'GET' });
+api.listActiveSiteMatches = (opts?: {
+  page?: number;
+  pageSize?: number;
+  category?: 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL';
+}) => {
+  const qs = new URLSearchParams();
+  if (opts?.page) qs.set('page', String(opts.page));
+  if (opts?.pageSize) qs.set('pageSize', String(opts.pageSize));
+  if (opts?.category) qs.set('category', opts.category);
+  const suffix = qs.toString() ? `?${qs.toString()}` : '';
+  return request<{
+    matches: ApiSiteActiveMatch[];
+    page: number;
+    pageSize: number;
+    total: number;
+    hasMore: boolean;
+  }>(`/matches/active${suffix}`, { method: 'GET' });
+};
 api.getMatchState = (matchId: string) =>
   request<{ match: ApiMatchState }>(`/match/${matchId}`, { method: 'GET' });
 

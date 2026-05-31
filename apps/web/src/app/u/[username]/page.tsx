@@ -27,6 +27,8 @@ import {
   ArrowUpRight,
   X,
   Sparkles,
+  Share2,
+  Check as CheckIcon,
 } from 'lucide-react';
 
 function fmtTC(initialSec: number, incrementSec: number) {
@@ -226,6 +228,7 @@ export default function ProfilePage() {
               <Swords size={16} strokeWidth={1.5} />
               Challenge
             </button>
+            <ShareProfileButton username={profile.username} />
           </div>
         </div>
       </section>
@@ -541,6 +544,57 @@ export default function ProfilePage() {
 }
 
 /* ─────────────────── helpers ─────────────────── */
+
+function ShareProfileButton({ username }: { username: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function share() {
+    const url =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/u/${username}`
+        : `/u/${username}`;
+    const data = {
+      title: `${username} on Omnira`,
+      text: `Check out ${username}'s chess profile on Omnira.`,
+      url,
+    };
+    // Prefer the native Web Share API on mobile / supporting browsers.
+    if (typeof navigator !== 'undefined' && 'share' in navigator) {
+      try {
+        await navigator.share(data);
+        return;
+      } catch {
+        /* user cancelled or share failed — fall through to clipboard */
+      }
+    }
+    try {
+      await navigator.clipboard?.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      /* clipboard unavailable in this context */
+    }
+  }
+
+  return (
+    <button
+      onClick={share}
+      className="rounded-md border border-parchment-400 px-5 py-2.5 text-sm font-medium uppercase tracking-wide text-ink-600 hover:border-gold-400 hover:text-gold-700 transition inline-flex items-center justify-center gap-2"
+    >
+      {copied ? (
+        <>
+          <CheckIcon size={16} strokeWidth={2} className="text-gold-600" />
+          Copied
+        </>
+      ) : (
+        <>
+          <Share2 size={16} strokeWidth={1.5} />
+          Share
+        </>
+      )}
+    </button>
+  );
+}
 
 function AnalysisModal({
   a,

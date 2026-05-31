@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { api, type ApiSiteActiveMatch } from '@/lib/api';
@@ -17,16 +17,33 @@ function fmtTC(initialSec: number, incrementSec: number) {
 
 type Filter = 'all' | 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL';
 
+const PAGE_SIZE = 24;
+
 export default function WatchPage() {
   const [matches, setMatches] = useState<ApiSiteActiveMatch[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+
+  // Reset to page 1 whenever the filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [filter]);
 
   useEffect(() => {
     let cancelled = false;
     const fetchOnce = async () => {
       try {
-        const r = await api.listActiveSiteMatches();
-        if (!cancelled) setMatches(r.matches);
+        const r = await api.listActiveSiteMatches({
+          page,
+          pageSize: PAGE_SIZE,
+          category: filter === 'all' ? undefined : filter,
+        });
+        if (cancelled) return;
+        setMatches(r.matches);
+        setTotal(r.total);
+        setHasMore(r.hasMore);
       } catch {
         /* ignore */
       }
@@ -37,22 +54,50 @@ export default function WatchPage() {
       cancelled = true;
       clearInterval(id);
     };
-  }, []);
+  }, [page, filter]);
 
-  const filtered = useMemo(() => {
-    if (filter === 'all') return matches;
-    return matches.filter((m) => m.category === filter);
-  }, [matches, filter]);
+  // Server returns matches already filtered + paginated; pass through.
+  const filtered = matches;
 
-  const counts = useMemo(() => {
-    return {
-      all: matches.length,
-      BULLET: matches.filter((m) => m.category === 'BULLET').length,
-      BLITZ: matches.filter((m) => m.category === 'BLITZ').length,
-      RAPID: matches.filter((m) => m.category === 'RAPID').length,
-      CLASSICAL: matches.filter((m) => m.category === 'CLASSICAL').length,
+  const [counts, setCounts] = useState({
+    all: 0,
+    BULLET: 0,
+    BLITZ: 0,
+    RAPID: 0,
+    CLASSICAL: 0,
+  });
+  // Cheap polling per-category count so filter chips show live numbers.
+  useEffect(() => {
+    let cancelled = false;
+    const pull = async () => {
+      try {
+        const [all, bullet, blitz, rapid, classical] = await Promise.all([
+          api.listActiveSiteMatches({ pageSize: 1 }),
+          api.listActiveSiteMatches({ pageSize: 1, category: 'BULLET' }),
+          api.listActiveSiteMatches({ pageSize: 1, category: 'BLITZ' }),
+          api.listActiveSiteMatches({ pageSize: 1, category: 'RAPID' }),
+          api.listActiveSiteMatches({ pageSize: 1, category: 'CLASSICAL' }),
+        ]);
+        if (!cancelled) {
+          setCounts({
+            all: all.total,
+            BULLET: bullet.total,
+            BLITZ: blitz.total,
+            RAPID: rapid.total,
+            CLASSICAL: classical.total,
+          });
+        }
+      } catch {
+        /* ignore */
+      }
     };
-  }, [matches]);
+    void pull();
+    const id = setInterval(pull, 4_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const filterDefs: Array<{
     id: Filter;
@@ -80,7 +125,7 @@ export default function WatchPage() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gold-500 opacity-60" />
               <span className="relative inline-flex h-2 w-2 rounded-full bg-gold-shine" />
             </span>
-            {matches.length} live games across Omnira
+            {counts.all} live games across Omnira
           </p>
         </div>
 
@@ -200,6 +245,32 @@ export default function WatchPage() {
               </div>
             </Link>
           ))}
+        </div>
+      )}
+
+      {/* Pager — only shows when there's more than one page of results */}
+      {filtered.length > 0 && (page > 1 || hasMore) && (
+        <div className="mt-8 flex items-center justify-between text-sm">
+          <span className="text-ink-400">
+            Page {page}
+            {total > 0 && <> · {total} {total === 1 ? 'match' : 'matches'}</>}
+          </span>
+          <div className="flex gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="rounded-md border border-parchment-400 px-4 py-2 text-sm text-ink-600 hover:border-ink-900 hover:text-ink-900 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              disabled={!hasMore}
+              onClick={() => setPage((p) => p + 1)}
+              className="rounded-md bg-gold-shine px-4 py-2 text-sm font-medium text-parchment-50 shadow-soft hover:opacity-90 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
     </div>

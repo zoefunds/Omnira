@@ -28,22 +28,33 @@ export function AuthGuard() {
     (async () => {
       try {
         const res = await api.me(token);
-        // Refresh ONLY the user record. Use raw setState so we don't clobber
-        // token/refreshToken — auto-refresh in api.request may have rotated
-        // the token in localStorage already.
         useAuth.setState({ user: res.user });
       } catch (e) {
         if (e instanceof ApiError && (e.status === 401 || e.status === 404)) {
-          disconnectSocket();
-          clear();
-          const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset'];
-          if (!publicPages.some((p) => pathname === p || pathname?.startsWith(p + '/'))) {
-            router.replace('/login');
-          }
+          handleExpired();
         }
       }
     })();
-  }, [hydrated, token, user, clear, router, pathname]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated, token, user]);
+
+  function handleExpired() {
+    disconnectSocket();
+    clear();
+    const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset'];
+    if (!publicPages.some((p) => pathname === p || pathname?.startsWith(p + '/'))) {
+      const next = pathname && pathname !== '/' ? `?next=${encodeURIComponent(pathname)}` : '';
+      router.replace(`/login${next}`);
+    }
+  }
+
+  // Listen for global session-expired event from api.request auto-refresh.
+  useEffect(() => {
+    const onExpired = () => handleExpired();
+    window.addEventListener('omnira:session-expired', onExpired);
+    return () => window.removeEventListener('omnira:session-expired', onExpired);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
 
   return null;
 }

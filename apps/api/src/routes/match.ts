@@ -35,28 +35,43 @@ export async function registerMatchRoutes(app: FastifyInstance) {
     return reply.send({ match: snapshotRoom(room) });
   });
 
-  app.get('/matches/active', { config: { rateLimit: false } }, async (req, reply) => {
-    void req; void reply;
-    const liveIds = new Set(listLiveRoomIds());
-    if (liveIds.size === 0) return { matches: [] };
-    const rows = await prisma.match.findMany({
-      where: { status: 'ACTIVE', id: { in: Array.from(liveIds) } },
-      select: {
-        id: true,
-        whitePlayerId: true,
-        blackPlayerId: true,
-        whitePlayer: { select: { id: true, username: true } },
-        blackPlayer: { select: { id: true, username: true } },
-        category: true,
-        initialTimeSec: true,
-        incrementSec: true,
-        tournamentId: true,
-        startedAt: true,
-        moves: { orderBy: { ply: 'desc' }, take: 1, select: { fenAfter: true, ply: true } },
-      },
-      orderBy: { startedAt: 'desc' },
-      take: 60,
-    });
+  app.get('/matches/active', { config: { rateLimit: false } }, async (req) => {
+    const q = req.query as { page?: string; pageSize?: string; category?: string };
+    const page = Math.max(1, Math.min(50, Number(q.page) || 1));
+    const pageSize = Math.max(1, Math.min(60, Number(q.pageSize) || 24));
+    const liveIds = listLiveRoomIds();
+    if (liveIds.length === 0) {
+      return { matches: [], page, pageSize, total: 0, hasMore: false };
+    }
+    const where = {
+      status: 'ACTIVE' as const,
+      id: { in: liveIds },
+      ...(q.category && /^(BULLET|BLITZ|RAPID|CLASSICAL)$/.test(q.category)
+        ? { category: q.category as 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL' }
+        : {}),
+    };
+    const [total, rows] = await Promise.all([
+      prisma.match.count({ where }),
+      prisma.match.findMany({
+        where,
+        select: {
+          id: true,
+          whitePlayerId: true,
+          blackPlayerId: true,
+          whitePlayer: { select: { id: true, username: true } },
+          blackPlayer: { select: { id: true, username: true } },
+          category: true,
+          initialTimeSec: true,
+          incrementSec: true,
+          tournamentId: true,
+          startedAt: true,
+          moves: { orderBy: { ply: 'desc' }, take: 1, select: { fenAfter: true, ply: true } },
+        },
+        orderBy: { startedAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
     const matches = rows.map((m) => ({
       id: m.id,
       whitePlayer: m.whitePlayer,
@@ -69,7 +84,13 @@ export async function registerMatchRoutes(app: FastifyInstance) {
       currentFen: m.moves[0]?.fenAfter ?? null,
       ply: m.moves[0]?.ply ?? 0,
     }));
-    return { matches };
+    return {
+      matches,
+      page,
+      pageSize,
+      total,
+      hasMore: page * pageSize < total,
+    };
   });
 
   app.get('/match/:id', { config: { rateLimit: false } }, async (req, reply) => {
