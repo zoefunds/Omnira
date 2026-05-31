@@ -1,15 +1,36 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { Field } from '@/components/Field';
 import { Crown, Wallet, ShieldCheck } from 'lucide-react';
 
-export default function SignupPage() {
+function safeNext(raw: string | null): string {
+  if (!raw) return '/lobby';
+  try {
+    const decoded = decodeURIComponent(raw);
+    if (decoded.startsWith('/') && !decoded.startsWith('//')) return decoded;
+  } catch {
+    /* ignore */
+  }
+  return '/lobby';
+}
+
+export default function SignupRoute() {
+  return (
+    <Suspense fallback={null}>
+      <SignupPage />
+    </Suspense>
+  );
+}
+
+function SignupPage() {
   const router = useRouter();
+  const params = useSearchParams();
+  const nextHref = safeNext(params.get('next'));
   const setSession = useAuth((s) => s.setSession);
   const [form, setForm] = useState({ email: '', username: '', password: '' });
   const [errors, setErrors] = useState<Partial<typeof form> & { _form?: string }>({});
@@ -22,7 +43,7 @@ export default function SignupPage() {
     try {
       const res = await api.signup(form);
       setSession({ token: res.token, user: res.user });
-      router.push('/lobby');
+      router.push(nextHref);
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.code === 'EMAIL_TAKEN') setErrors({ email: 'already in use' });
@@ -150,7 +171,11 @@ export default function SignupPage() {
           <p className="mt-6 text-sm text-ink-600">
             Already have an account?{' '}
             <Link
-              href="/login"
+              href={
+                nextHref === '/lobby'
+                  ? '/login'
+                  : `/login?next=${encodeURIComponent(nextHref)}`
+              }
               className="text-gold-700 font-medium hover:text-gold-600"
             >
               Sign in

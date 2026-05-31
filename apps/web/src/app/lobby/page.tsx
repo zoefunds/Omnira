@@ -24,27 +24,30 @@ export default function LobbyPage() {
     if (!user || !token) router.replace('/login');
   }, [hydrated, user, token, router]);
 
-  // If the user has an active game on the server (e.g. after a page reload),
-  // rehydrate the match store and jump straight to /play.
+  // If the user has an active game on the server (e.g. after a page reload,
+  // or when match:start was missed during a reconnect), rehydrate the match
+  // store and jump straight to /play. Runs on mount AND on every socket
+  // (re)connect.
   useEffect(() => {
     if (!user || !token || !socket) return;
     let cancelled = false;
-    (async () => {
+    const recover = async () => {
       try {
         const { match } = await api.currentMatch(token);
         if (cancelled || !match || match.ended) return;
         m.hydrate({ ...match, myUserId: user.id });
-        socket.emit(
-          'match:rejoin',
-          { matchId: match.matchId },
-          (_ack: { ok: boolean }) => {},
-        );
+        socket.emit('match:rejoin', { matchId: match.matchId }, () => {});
         router.replace('/play');
       } catch {
-        // ignore — fall through to normal lobby
+        /* ignore */
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    void recover();
+    socket.on('connect', recover);
+    return () => {
+      cancelled = true;
+      socket.off('connect', recover);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id, token, socket]);
 

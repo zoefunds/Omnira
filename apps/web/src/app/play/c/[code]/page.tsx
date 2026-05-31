@@ -19,8 +19,11 @@ export default function PrivateChallengePage() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user || !token) router.replace(`/login?next=/play/c/${code}`);
-  }, [user, token, code, router]);
+    if (!hydrated) return; // wait for localStorage rehydration
+    if (!user || !token) {
+      router.replace(`/login?next=${encodeURIComponent(`/play/c/${code}`)}`);
+    }
+  }, [hydrated, user, token, code, router]);
 
   useEffect(() => {
     let alive = true;

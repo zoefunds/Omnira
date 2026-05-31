@@ -7,14 +7,20 @@ let socket: Socket | null = null;
 let currentToken: string | null = null;
 
 export function getSocket(token: string): Socket {
-  if (socket && currentToken === token && socket.connected) return socket;
+  // Return the same socket instance whenever the token matches, regardless of
+  // whether the underlying WebSocket has finished its handshake. Socket.IO
+  // handles reconnection on its own; tearing the socket down here causes the
+  // server to emit to a stale `user:${userId}` room and the client misses
+  // events (notably `match:start`) during the brief reconnect window.
+  if (socket && currentToken === token) return socket;
   if (socket) socket.disconnect();
   currentToken = token;
   socket = io(API_BASE, {
     auth: { token },
     transports: ['websocket'],
     reconnection: true,
-    reconnectionAttempts: 5,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
   });
   return socket;
 }
