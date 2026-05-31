@@ -81,7 +81,12 @@ export default function WatchMatchPage() {
     };
   }, [socket, matchId]);
 
-  if (!m) return <div className="text-ink-600 text-sm">Loading…</div>;
+  if (!m)
+    return (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-20 text-center text-sm text-ink-600">
+        Loading.
+      </div>
+    );
 
   const rows: Array<{ n: number; w?: string; b?: string }> = [];
   for (const it of history) {

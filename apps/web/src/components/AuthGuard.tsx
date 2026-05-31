@@ -15,7 +15,7 @@ import { disconnectSocket } from '@/lib/socket';
  * the browser still has a stale JWT + user record cached.
  */
 export function AuthGuard() {
-  const { token, user, hydrated, clear, setSession } = useAuth();
+  const { token, user, hydrated, clear } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const ran = useRef(false);
@@ -28,13 +28,14 @@ export function AuthGuard() {
     (async () => {
       try {
         const res = await api.me(token);
-        // Refresh the user record in case username/email changed.
-        setSession({ token, user: res.user });
+        // Refresh ONLY the user record. Use raw setState so we don't clobber
+        // token/refreshToken — auto-refresh in api.request may have rotated
+        // the token in localStorage already.
+        useAuth.setState({ user: res.user });
       } catch (e) {
         if (e instanceof ApiError && (e.status === 401 || e.status === 404)) {
           disconnectSocket();
           clear();
-          // If they're already on a public page, no need to redirect.
           const publicPages = ['/', '/login', '/signup', '/forgot-password', '/reset'];
           if (!publicPages.some((p) => pathname === p || pathname?.startsWith(p + '/'))) {
             router.replace('/login');
@@ -42,7 +43,7 @@ export function AuthGuard() {
         }
       }
     })();
-  }, [hydrated, token, user, clear, setSession, router, pathname]);
+  }, [hydrated, token, user, clear, router, pathname]);
 
   return null;
 }

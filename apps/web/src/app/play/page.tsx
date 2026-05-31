@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/store/auth';
 import { useMatch } from '@/store/match';
@@ -15,6 +15,9 @@ export default function PlayPage() {
   const { user, token, hydrated } = useAuth();
   const socket = useSocket(token);
   const m = useMatch();
+  // Gate RedirectToLobby on the rejoin check so we don't bounce out before
+  // /me/current-match has had a chance to rehydrate.
+  const [rejoinChecked, setRejoinChecked] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -24,20 +27,24 @@ export default function PlayPage() {
   // Rejoin on direct /play visit if local state is empty (page reload, deep link).
   useEffect(() => {
     if (!user || !token || !socket) return;
-    if (m.matchId) return; // already in a match locally
+    if (m.matchId) {
+      setRejoinChecked(true);
+      return;
+    }
     let cancelled = false;
     (async () => {
       try {
         const { match } = await api.currentMatch(token);
-        if (cancelled || !match || match.ended) {
-          // No server-side active match: send the user back to the lobby.
-          router.replace('/lobby');
+        if (cancelled) return;
+        if (!match || match.ended) {
+          setRejoinChecked(true);
           return;
         }
         m.hydrate({ ...match, myUserId: user.id });
         socket.emit('match:rejoin', { matchId: match.matchId }, () => {});
+        setRejoinChecked(true);
       } catch {
-        router.replace('/lobby');
+        if (!cancelled) setRejoinChecked(true);
       }
     })();
     return () => { cancelled = true; };
@@ -99,8 +106,13 @@ export default function PlayPage() {
     <div className="flex">
       <PlaySidebar />
 
-      <div className="flex-1 max-w-6xl mx-auto px-6 py-10 space-y-8">
-        {!inMatch && !hasResult && <RedirectToLobby />}
+      <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 w-full">
+        {!inMatch && !hasResult && rejoinChecked && <RedirectToLobby />}
+        {!inMatch && !hasResult && !rejoinChecked && (
+          <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-12 text-center text-sm text-ink-600">
+            Reconnecting to your game…
+          </div>
+        )}
         {(inMatch || hasResult) && <MatchView socket={socket} />}
 
         <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 p-4 max-w-md text-xs text-ink-400 shadow-card">

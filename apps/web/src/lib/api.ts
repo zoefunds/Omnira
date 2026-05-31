@@ -67,10 +67,18 @@ async function attemptRefresh(): Promise<string | null> {
     });
     if (!r.ok) return null;
     const j = (await r.json()) as { token: string };
-    // Update storage in place; the page's useAuth will rehydrate on next render.
+    // Update storage in place.
     const parsed = JSON.parse(raw);
     parsed.state.token = j.token;
     localStorage.setItem('omnira.auth', JSON.stringify(parsed));
+    // Also update the in-memory Zustand store so subsequent calls in this
+    // session use the fresh token without waiting for a page reload.
+    try {
+      const { useAuth } = await import('@/store/auth');
+      useAuth.setState({ token: j.token });
+    } catch {
+      /* ignore — circular import safety */
+    }
     return j.token;
   } catch {
     return null;

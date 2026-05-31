@@ -43,7 +43,11 @@ export default function PrivateChallengePage() {
   }, [socket, user?.id]);
 
   if (!user || !challenge) {
-    return <div className="text-ink-600">{err ?? 'Loading…'}</div>;
+    return (
+      <div className="max-w-md mx-auto px-4 sm:px-6 py-20 text-center text-sm text-ink-600">
+        {err ?? 'Loading.'}
+      </div>
+    );
   }
 
   const mine = challenge.creatorId === user.id;
