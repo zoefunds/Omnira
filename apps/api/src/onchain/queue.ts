@@ -200,7 +200,25 @@ async function runOp(op: Op): Promise<boolean> {
     if (op.kind === 'finalize') {
       const pm = pmFor(op.matchId);
       if (!pm.registered) return false;
-      log(op.matchId, 'finalize: sending', { status: op.status, signer: op.signerUserId });
+
+      // Idempotency: if the match is already settled, do not re-submit.
+      const existing = await prisma.match.findUnique({
+        where: { id: op.matchId },
+        select: { onchainSettledAt: true, onchainTxHash: true, finalizeAttempts: true },
+      });
+      if (existing?.onchainSettledAt && existing.onchainTxHash) {
+        log(op.matchId, 'finalize: already settled — skipping', {
+          tx: existing.onchainTxHash,
+        });
+        pending.delete(op.matchId);
+        return true;
+      }
+
+      log(op.matchId, 'finalize: sending', {
+        status: op.status,
+        signer: op.signerUserId,
+        attempt: (existing?.finalizeAttempts ?? 0) + 1,
+      });
       const tx = await finalizeMatchOnchain({
         matchId: op.matchId,
         signerUserId: op.signerUserId,
@@ -211,7 +229,12 @@ async function runOp(op: Op): Promise<boolean> {
       });
       await prisma.match.update({
         where: { id: op.matchId },
-        data: { onchainSettledAt: new Date() },
+        data: {
+          onchainSettledAt: new Date(),
+          onchainTxHash: tx,
+          finalizeAttempts: { increment: 1 },
+          finalizeError: null,
+        },
       });
       consecutiveFailures = 0;
       log(op.matchId, 'finalize: ok', { tx });
@@ -221,8 +244,37 @@ async function runOp(op: Op): Promise<boolean> {
     return true;
   } catch (e) {
     logErr(op.matchId, e, { op: op.kind, consecutiveFailures: consecutiveFailures + 1 });
+    if (op.kind === 'finalize') {
+      // Record the error + attempt count so ops can triage stuck matches.
+      const msg = (e as Error)?.message?.slice(0, 500) ?? 'unknown';
+      await prisma.match
+        .update({
+          where: { id: op.matchId },
+          data: {
+            finalizeAttempts: { increment: 1 },
+            finalizeError: msg,
+          },
+        })
+        .catch(() => {});
+    }
     return false;
   }
+}
+
+/** Max times we'll keep retrying a finalize before parking it. */
+const MAX_FINALIZE_ATTEMPTS = 8;
+
+/** Allows the queue worker to ask: is this finalize op exhausted? */
+export async function isFinalizeExhausted(matchId: string): Promise<boolean> {
+  const m = await prisma.match
+    .findUnique({
+      where: { id: matchId },
+      select: { finalizeAttempts: true, onchainSettledAt: true },
+    })
+    .catch(() => null);
+  if (!m) return false;
+  if (m.onchainSettledAt) return true; // already done
+  return m.finalizeAttempts >= MAX_FINALIZE_ATTEMPTS;
 }
 
 export async function drainQueue(timeoutMs = 60_000): Promise<void> {

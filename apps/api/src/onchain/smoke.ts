@@ -51,7 +51,7 @@ async function main() {
   console.log('finalizing as white…');
   const tx2 = await finalizeMatchOnchain({
     matchId,
-    whitePlayerId: white.id,
+    signerUserId: white.id,
     status: 'DRAW',
     resultReason: 'AGREEMENT',
     finalFen: '8/8/8/4k3/8/8/8/4K3 w - - 0 1',

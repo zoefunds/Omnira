@@ -44,8 +44,52 @@ model User {
   chatMessages       ChatMessage[] @relation("ChatMessages")
   sessions      Session[]
   passwordResets PasswordResetToken[]
+  emailVerifications EmailVerificationToken[]
+  notifications  Notification[]
 
   @@index([createdAt])
+}
+
+// ─────────────────────────── EMAIL VERIFICATION ───────────────────────────
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  email     String    // the email address being verified (in case it changes)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─────────────────────────── NOTIFICATIONS ───────────────────────────
+
+enum NotificationKind {
+  WELCOME
+  MATCH_INVITE
+  TOURNAMENT_STARTING
+  DAILY_PUZZLE
+  ANALYSIS_READY
+  FRIEND_ACTIVITY
+  ANNOUNCEMENT
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      NotificationKind
+  title     String
+  body      String
+  href      String?          // optional click-through path
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }
 
 // ─────────────────────────── PASSWORD RESET ───────────────────────────
@@ -173,6 +217,10 @@ model Match {
   onchainMatchId    String?           // id returned by MatchRegistry contract
   onchainTxHash     String?
   onchainSettledAt  DateTime?
+  /// Number of finalize retries attempted. Caps retry storms.
+  finalizeAttempts  Int               @default(0)
+  /// Last finalize error message (truncated) for ops triage.
+  finalizeError     String?
 
   startedAt       DateTime?
   endedAt         DateTime?

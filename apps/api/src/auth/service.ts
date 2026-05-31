@@ -21,6 +21,7 @@ export interface PublicUser {
   username: string;
   walletAddress: string;
   avatarUrl: string | null;
+  emailVerified: boolean;
   createdAt: Date;
 }
 
@@ -30,6 +31,7 @@ function toPublic(user: {
   username: string;
   createdAt: Date;
   avatarUrl?: string | null;
+  emailVerified?: boolean;
   wallet: { address: string } | null;
 }): PublicUser {
   if (!user.wallet) throw new AuthError('NO_WALLET', 'user has no wallet (invariant broken)', 500);
@@ -39,6 +41,7 @@ function toPublic(user: {
     username: user.username,
     walletAddress: user.wallet.address,
     avatarUrl: user.avatarUrl ?? null,
+    emailVerified: user.emailVerified ?? false,
     createdAt: user.createdAt,
   };
 }
@@ -89,6 +92,7 @@ export async function signup(input: SignupInput): Promise<PublicUser> {
           username: true,
           createdAt: true,
           avatarUrl: true,
+          emailVerified: true,
           wallet: { select: { address: true } },
         },
       });
@@ -126,6 +130,7 @@ export async function login(input: LoginInput): Promise<PublicUser> {
       createdAt: true,
       deletedAt: true,
       avatarUrl: true,
+          emailVerified: true,
       wallet: { select: { address: true } },
     },
   });
@@ -145,6 +150,43 @@ export async function login(input: LoginInput): Promise<PublicUser> {
   return toPublic(user);
 }
 
+/**
+ * Soft-delete a user. Preserves match history (the other player's record
+ * stays accurate) while scrubbing personally-identifying fields.
+ *
+ * The wallet row is preserved because the on-chain address is immutable;
+ * leaving the wallet row in place keeps prior matches verifiable.
+ *
+ * Caller must verify the user's password before invoking this.
+ */
+export async function deleteAccount(userId: string): Promise<void> {
+  const tag = userId.slice(0, 8);
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        email: `deleted-${tag}@omnira.invalid`,
+        emailLower: `deleted-${tag}@omnira.invalid`,
+        username: `deleted-${tag}`,
+        usernameLower: `deleted-${tag}`,
+        passwordHash: '!',
+        avatarUrl: null,
+        emailVerified: false,
+        deletedAt: new Date(),
+      },
+    });
+    // Revoke every session so any cached JWT becomes useless.
+    await tx.session.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    await tx.passwordResetToken.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date() },
+    });
+  });
+}
+
 export async function getMe(userId: string): Promise<PublicUser> {
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
@@ -154,6 +196,7 @@ export async function getMe(userId: string): Promise<PublicUser> {
       username: true,
       createdAt: true,
       avatarUrl: true,
+          emailVerified: true,
       wallet: { select: { address: true } },
     },
   });

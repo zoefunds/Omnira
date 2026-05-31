@@ -70,11 +70,14 @@ export async function flagMatchIfSuspicious(matchId: string): Promise<number> {
   const wRating = m.whiteRatingBefore ?? 1500;
   const bRating = m.blackRatingBefore ?? 1500;
 
+  type SideEntry = readonly ['w' | 'b', SideStats, string, number];
+  const entries: SideEntry[] = [
+    ['w', white, m.whitePlayerId, wRating - bRating],
+    ['b', black, m.blackPlayerId, bRating - wRating],
+  ];
+
   let created = 0;
-  for (const [color, side, userId, gap] of [
-    ['w' as const, white, m.whitePlayerId, wRating - bRating],
-    ['b' as const, black, m.blackPlayerId, bRating - wRating],
-  ]) {
+  for (const [color, side, userId, gap] of entries) {
     const verdict = classify(side, gap);
     if (!verdict) continue;
     try {

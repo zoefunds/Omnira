@@ -36,11 +36,15 @@ function todayUtcDate(): string {
 }
 
 /** Convert YYYY-MM-DD + HH:MM (UTC) into ISO. If past, bump by one day. */
-function toIsoUtc(dateStr: string, timeStr: string): string {
+function toIsoUtc(dateStr: string, timeStr: string): { iso: string; bumped: boolean } {
   const iso = `${dateStr}T${timeStr}:00.000Z`;
   let t = new Date(iso).getTime();
-  if (t < Date.now()) t += 86_400_000; // tomorrow if already past
-  return new Date(t).toISOString();
+  let bumped = false;
+  if (t < Date.now()) {
+    t += 86_400_000; // tomorrow if already past
+    bumped = true;
+  }
+  return { iso: new Date(t).toISOString(), bumped };
 }
 
 interface Props {
@@ -59,12 +63,12 @@ export function CreateTournamentModal({ onClose, onCreated }: Props) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
-  const startsAtIso = useMemo(
+  const startsAt = useMemo(
     () => toIsoUtc(startDate, startTime),
     [startDate, startTime],
   );
   const startsLocal = useMemo(() => {
-    const d = new Date(startsAtIso);
+    const d = new Date(startsAt.iso);
     return d.toLocaleString(undefined, {
       weekday: 'short',
       month: 'short',
@@ -72,7 +76,7 @@ export function CreateTournamentModal({ onClose, onCreated }: Props) {
       hour: '2-digit',
       minute: '2-digit',
     });
-  }, [startsAtIso]);
+  }, [startsAt.iso]);
 
   async function submit() {
     if (!token) return;
@@ -85,7 +89,7 @@ export function CreateTournamentModal({ onClose, onCreated }: Props) {
           initialMs: tc.initialMs,
           incrementMs: tc.incrementMs,
           rated,
-          startsAt: startsAtIso,
+          startsAt: startsAt.iso,
           durationMs: duration.ms,
         },
         token,
@@ -209,6 +213,12 @@ export function CreateTournamentModal({ onClose, onCreated }: Props) {
             Your local time:{' '}
             <span className="text-ink-600">{startsLocal}</span>
           </div>
+          {startsAt.bumped && (
+            <div className="mt-2 rounded-md border border-gold-300 bg-parchment-50 px-3 py-2 text-[11px] text-gold-700 leading-snug">
+              That time has already passed today (UTC), so it&apos;s been
+              scheduled for tomorrow.
+            </div>
+          )}
         </div>
 
         {/* Mode */}

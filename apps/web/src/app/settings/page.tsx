@@ -13,7 +13,8 @@ import {
 } from '@/store/settings';
 import { UserAvatar } from '@/components/UserAvatar';
 import { ExportWalletModal } from '@/components/ExportWalletModal';
-import { KeyRound } from 'lucide-react';
+import { DeleteAccountModal } from '@/components/DeleteAccountModal';
+import { KeyRound, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
 import {
   User,
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   >('account');
   const [savedFlash, setSavedFlash] = useState<string | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -124,7 +126,14 @@ export default function SettingsPage() {
             >
               <AvatarRow userId={user.id} username={user.username} avatarUrl={user.avatarUrl} onChange={flash} />
               <Row label="Username" value={user.username} hint="Visible to other players." />
-              <Row label="Email" value={user.email} hint="Used to sign in." />
+              <Row
+                label="Email"
+                value={user.email}
+                hint={user.emailVerified ? 'Verified.' : 'Not verified yet.'}
+              />
+              {!user.emailVerified && token && (
+                <EmailVerifyRow token={token} />
+              )}
               <Row
                 label="Member since"
                 value={new Date(user.createdAt).toLocaleDateString()}
@@ -194,6 +203,29 @@ export default function SettingsPage() {
               <button className="mt-4 rounded-md bg-gold-shine px-5 py-2 text-sm font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition">
                 Change password
               </button>
+
+              <div className="mt-8 rounded-md border border-danger/30 bg-danger/5 p-4">
+                <div className="flex items-start gap-3">
+                  <div className="h-9 w-9 rounded-md bg-danger/10 text-danger flex items-center justify-center shrink-0">
+                    <Trash2 size={16} strokeWidth={1.5} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-danger">
+                      Delete account
+                    </div>
+                    <p className="text-xs text-ink-600 mt-1 leading-relaxed">
+                      Removes your username, email, and avatar. Match history
+                      and wallet address stay on-chain. This cannot be undone.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setDeleteOpen(true)}
+                    className="rounded-md border border-danger px-4 py-2 text-xs font-medium uppercase tracking-wide text-danger hover:bg-danger hover:text-parchment-50 transition shrink-0"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
             </Panel>
           )}
 
@@ -244,8 +276,9 @@ export default function SettingsPage() {
                   label: LANG_LABEL[v],
                 }))}
                 onChange={(v) => {
+                  // No flash — the entire surface re-renders in the new language
+                  // a beat later, which is its own confirmation.
                   settings.setLanguage(v);
-                  flash();
                 }}
               />
             </Panel>
@@ -255,6 +288,9 @@ export default function SettingsPage() {
 
       {exportOpen && (
         <ExportWalletModal onClose={() => setExportOpen(false)} />
+      )}
+      {deleteOpen && (
+        <DeleteAccountModal onClose={() => setDeleteOpen(false)} />
       )}
     </div>
   );
@@ -346,6 +382,33 @@ function Toggle({
             on ? 'translate-x-5' : 'translate-x-0.5'
           }`}
         />
+      </button>
+    </div>
+  );
+}
+
+function EmailVerifyRow({ token }: { token: string }) {
+  const [sent, setSent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="rounded-md border border-gold-300 bg-parchment-50 p-3 text-xs leading-relaxed text-ink-600">
+      Verify your email to secure password resets and recovery.{' '}
+      <button
+        disabled={busy || sent}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await api.resendVerification(token);
+            setSent(true);
+          } catch {
+            /* swallow */
+          } finally {
+            setBusy(false);
+          }
+        }}
+        className="ml-1 text-gold-700 hover:text-gold-600 font-medium disabled:opacity-60"
+      >
+        {sent ? 'Sent — check your inbox' : busy ? 'Sending.' : 'Resend verification email'}
       </button>
     </div>
   );

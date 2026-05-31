@@ -6,6 +6,24 @@ export interface ApiUser {
   username: string;
   walletAddress: string;
   avatarUrl: string | null;
+  emailVerified: boolean;
+  createdAt: string;
+}
+
+export interface ApiNotification {
+  id: string;
+  kind:
+    | 'WELCOME'
+    | 'MATCH_INVITE'
+    | 'TOURNAMENT_STARTING'
+    | 'DAILY_PUZZLE'
+    | 'ANALYSIS_READY'
+    | 'FRIEND_ACTIVITY'
+    | 'ANNOUNCEMENT';
+  title: string;
+  body: string;
+  href: string | null;
+  readAt: string | null;
   createdAt: string;
 }
 
@@ -175,6 +193,37 @@ export const api = {
   },
   removeAvatar(token: string) {
     return request<{ ok: true }>('/me/avatar', { method: 'DELETE', token });
+  },
+  deleteAccount(body: { password: string; confirmUsername: string }, token: string) {
+    return request<{ ok: true }>('/me', {
+      method: 'DELETE',
+      token,
+      body: JSON.stringify(body),
+    });
+  },
+  verifyEmail(body: { token: string }) {
+    return request<{ ok: true }>('/auth/verify-email', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  },
+  resendVerification(token: string) {
+    return request<{ ok: true }>('/me/resend-verification', {
+      method: 'POST',
+      token,
+    });
+  },
+  listNotifications(token: string) {
+    return request<{ items: ApiNotification[]; unread: number }>(
+      '/me/notifications',
+      { method: 'GET', token },
+    );
+  },
+  markNotificationsRead(body: { ids?: string[]; all?: boolean }, token: string) {
+    return request<{ ok: true; updated: number }>(
+      '/me/notifications/mark-read',
+      { method: 'POST', token, body: JSON.stringify(body) },
+    );
   },
   exportWallet(body: { password: string }, token: string) {
     return request<{
