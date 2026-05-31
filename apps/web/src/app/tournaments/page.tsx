@@ -2,7 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
+import { loginHref } from '@/lib/loginNext';
 import { api, type ApiTournament } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { CreateTournamentModal } from '@/components/CreateTournamentModal';
@@ -42,14 +43,15 @@ type Filter = 'all' | 'active' | 'upcoming' | 'finished';
 
 export default function TournamentsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useAuth();
   const [list, setList] = useState<ApiTournament[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
   const [modal, setModal] = useState(false);
 
   useEffect(() => {
-    if (!user) router.replace('/login');
-  }, [user, router]);
+    if (!user) router.replace(loginHref(pathname));
+  }, [user, router, pathname]);
 
   async function refresh() {
     const r = await api.listTournaments();

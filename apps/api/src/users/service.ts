@@ -10,6 +10,7 @@ export interface PublicProfile {
   id: string;
   username: string;
   walletAddress: string | null;
+  avatarUrl: string | null;
   memberSince: string;
   ratings: Array<{
     category: TimeControlCategory;
@@ -26,6 +27,7 @@ export async function getProfile(usernameLower: string): Promise<PublicProfile> 
       id: true,
       username: true,
       createdAt: true,
+      avatarUrl: true,
       wallet: { select: { address: true } },
       ratings: true,
     },
@@ -35,6 +37,7 @@ export async function getProfile(usernameLower: string): Promise<PublicProfile> 
     id: user.id,
     username: user.username,
     walletAddress: user.wallet?.address ?? null,
+    avatarUrl: user.avatarUrl ?? null,
     memberSince: user.createdAt.toISOString(),
     ratings: user.ratings.map((r) => ({
       category: r.category,

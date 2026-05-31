@@ -5,6 +5,7 @@ export interface ApiUser {
   email: string;
   username: string;
   walletAddress: string;
+  avatarUrl: string | null;
   createdAt: string;
 }
 
@@ -143,6 +144,16 @@ export const api = {
       body: JSON.stringify(body),
     });
   },
+  setAvatar(body: { dataUrl: string }, token: string) {
+    return request<{ ok: true }>('/me/avatar', {
+      method: 'POST',
+      token,
+      body: JSON.stringify(body),
+    });
+  },
+  removeAvatar(token: string) {
+    return request<{ ok: true }>('/me/avatar', { method: 'DELETE', token });
+  },
   exportWallet(body: { password: string }, token: string) {
     return request<{
       address: string;
@@ -258,6 +269,7 @@ export interface ApiProfile {
   id: string;
   username: string;
   walletAddress: string | null;
+  avatarUrl: string | null;
   memberSince: string;
   ratings: Array<{
     category: 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL';

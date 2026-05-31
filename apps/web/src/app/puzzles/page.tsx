@@ -11,6 +11,8 @@ import {
   type ApiPuzzleStats,
 } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { loginHref } from '@/lib/loginNext';
+import { usePathname } from 'next/navigation';
 import {
   Puzzle,
   CheckCircle2,
@@ -31,6 +33,7 @@ type Phase = 'loading' | 'solving' | 'graded' | 'empty';
 
 export default function PuzzlesPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, token, hydrated } = useAuth();
   const [puzzle, setPuzzle] = useState<ApiPuzzle | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -41,8 +44,8 @@ export default function PuzzlesPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!user) router.replace('/login');
-  }, [hydrated, user, router]);
+    if (!user) router.replace(loginHref(pathname));
+  }, [hydrated, user, router, pathname]);
 
   const loadNext = useCallback(async () => {
     if (!token || !user) return;

@@ -168,6 +168,7 @@ export default function ProfilePage() {
             <ProfileAvatar
               userId={profile.id}
               username={profile.username}
+              avatarUrl={profile.avatarUrl}
             />
             <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-md bg-gold-shine px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-parchment-50 shadow-soft">
               Player
@@ -638,15 +639,18 @@ function AnalysisModal({
 function ProfileAvatar({
   userId,
   username,
+  avatarUrl,
 }: {
   userId: string;
   username: string;
+  avatarUrl: string | null;
 }) {
   return (
     <div className="h-28 w-28 md:h-32 md:w-32 rounded-xl overflow-hidden ring-1 ring-gold-700/30 shadow-card bg-gold-shine flex items-center justify-center">
       <UserAvatar
         userId={userId}
         username={username}
+        avatarUrl={avatarUrl}
         size={128}
         className="!rounded-xl !ring-0 !shadow-none"
       />

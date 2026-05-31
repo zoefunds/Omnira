@@ -20,6 +20,7 @@ export interface PublicUser {
   email: string;
   username: string;
   walletAddress: string;
+  avatarUrl: string | null;
   createdAt: Date;
 }
 
@@ -28,6 +29,7 @@ function toPublic(user: {
   email: string;
   username: string;
   createdAt: Date;
+  avatarUrl?: string | null;
   wallet: { address: string } | null;
 }): PublicUser {
   if (!user.wallet) throw new AuthError('NO_WALLET', 'user has no wallet (invariant broken)', 500);
@@ -36,6 +38,7 @@ function toPublic(user: {
     email: user.email,
     username: user.username,
     walletAddress: user.wallet.address,
+    avatarUrl: user.avatarUrl ?? null,
     createdAt: user.createdAt,
   };
 }
@@ -85,6 +88,7 @@ export async function signup(input: SignupInput): Promise<PublicUser> {
           email: true,
           username: true,
           createdAt: true,
+          avatarUrl: true,
           wallet: { select: { address: true } },
         },
       });
@@ -121,6 +125,7 @@ export async function login(input: LoginInput): Promise<PublicUser> {
       passwordHash: true,
       createdAt: true,
       deletedAt: true,
+      avatarUrl: true,
       wallet: { select: { address: true } },
     },
   });
@@ -148,6 +153,7 @@ export async function getMe(userId: string): Promise<PublicUser> {
       email: true,
       username: true,
       createdAt: true,
+      avatarUrl: true,
       wallet: { select: { address: true } },
     },
   });

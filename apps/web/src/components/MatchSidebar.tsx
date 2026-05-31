@@ -8,6 +8,7 @@ import { ChatPanel } from './ChatPanel';
 import { OnchainBadge } from './OnchainBadge';
 import { AnalysisPanel } from './AnalysisPanel';
 import { Handshake, Flag, Check, X } from 'lucide-react';
+import { ConfirmModal } from './ConfirmModal';
 
 type Tab = 'moves' | 'chat' | 'chain' | 'analysis';
 
@@ -19,6 +20,7 @@ export function MatchSidebar({ socket }: Props) {
   const { matchId, history, myColor, drawOfferFrom, ended } = useMatch();
   const [tab, setTab] = useState<Tab>('moves');
   const [offerSent, setOfferSent] = useState(false);
+  const [confirmResign, setConfirmResign] = useState(false);
 
   // Clear "offer sent" if game ends, opponent rejects (move played), or accepts.
   useEffect(() => {
@@ -30,8 +32,9 @@ export function MatchSidebar({ socket }: Props) {
 
   if (!matchId) return null;
 
-  function resign() {
-    if (confirm('Resign this game?')) socket.emit('match:resign', { matchId });
+  function doResign() {
+    socket.emit('match:resign', { matchId });
+    setConfirmResign(false);
   }
   function offerDraw() {
     socket.emit(
@@ -181,7 +184,7 @@ export function MatchSidebar({ socket }: Props) {
                 Offer draw
               </button>
               <button
-                onClick={resign}
+                onClick={() => setConfirmResign(true)}
                 className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md border border-danger/40 py-2 text-sm text-danger hover:bg-danger hover:text-parchment-50 transition"
               >
                 <Flag size={14} strokeWidth={1.5} />
@@ -191,6 +194,17 @@ export function MatchSidebar({ socket }: Props) {
           )}
         </div>
       )}
+
+      <ConfirmModal
+        open={confirmResign}
+        title="Resign this game?"
+        body="Your opponent wins. The result is settled onchain and your rating updates immediately."
+        confirmLabel="Resign"
+        cancelLabel="Keep playing"
+        variant="danger"
+        onConfirm={doResign}
+        onCancel={() => setConfirmResign(false)}
+      />
     </aside>
   );
 }

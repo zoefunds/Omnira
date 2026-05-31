@@ -24,6 +24,7 @@ model User {
   usernameLower String   @unique
   passwordHash  String   // argon2id — see Phase 3
   emailVerified Boolean  @default(false)
+  avatarUrl     String?  // base64 data URL, ≤ 256x256 JPEG, set by /me/avatar
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?

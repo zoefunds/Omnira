@@ -291,6 +291,14 @@ export function snapshotRoom(room: MatchRoom, now: number = Date.now()): {
 } {
   // Compute live clocks at "now" by subtracting elapsed since clock.tickFrom.
   const live = remainingMs(room.clock, now);
+  // Use verbose history so we can reconstruct proper UCI strings (from, to,
+  // promotion). Each entry is { from, to, promotion?, san, ... }.
+  const verbose = room.game.history({ verbose: true }) as Array<{
+    from: string;
+    to: string;
+    promotion?: string;
+    san: string;
+  }>;
   return {
     matchId: room.id,
     whitePlayerId: room.whitePlayerId,
@@ -302,10 +310,10 @@ export function snapshotRoom(room: MatchRoom, now: number = Date.now()): {
     blackMs: live.blackMs,
     turn: room.game.turn(),
     ply: room.ply,
-    history: room.game.history({ verbose: false }).map((san, i) => ({
+    history: verbose.map((mv, i) => ({
       ply: i + 1,
-      san,
-      uci: '',
+      san: mv.san,
+      uci: `${mv.from}${mv.to}${mv.promotion ?? ''}`,
     })),
     ended: room.ended,
     drawOfferFrom: room.drawOfferFrom,

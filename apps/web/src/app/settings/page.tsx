@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/store/auth';
+import { loginHref } from '@/lib/loginNext';
 import {
   useSettings,
   type Language,
@@ -13,6 +14,7 @@ import {
 import { UserAvatar } from '@/components/UserAvatar';
 import { ExportWalletModal } from '@/components/ExportWalletModal';
 import { KeyRound } from 'lucide-react';
+import { api, ApiError } from '@/lib/api';
 import {
   User,
   Wallet,
@@ -27,6 +29,7 @@ import { disconnectSocket } from '@/lib/socket';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, token, hydrated, clear } = useAuth();
   const settings = useSettings();
   const [tab, setTab] = useState<
@@ -37,8 +40,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (!hydrated) return;
-    if (!user || !token) router.replace('/login');
-  }, [hydrated, user, token, router]);
+    if (!user || !token) router.replace(loginHref(pathname));
+  }, [hydrated, user, token, router, pathname]);
 
   // Flash "Saved" briefly when any setting changes from this page.
   function flash() {
@@ -119,7 +122,7 @@ export default function SettingsPage() {
               title={settings.t('accountTitle')}
               description="Your public profile and basic information."
             >
-              <AvatarRow userId={user.id} username={user.username} onChange={flash} />
+              <AvatarRow userId={user.id} username={user.username} avatarUrl={user.avatarUrl} onChange={flash} />
               <Row label="Username" value={user.username} hint="Visible to other players." />
               <Row label="Email" value={user.email} hint="Used to sign in." />
               <Row
@@ -351,83 +354,106 @@ function Toggle({
 function AvatarRow({
   userId,
   username,
+  avatarUrl,
   onChange,
 }: {
   userId: string;
   username: string;
+  avatarUrl: string | null;
   onChange: () => void;
 }) {
-  const { avatars, setAvatar, clearAvatar } = useSettings();
-  const current = avatars[userId];
+  const token = useAuth((s) => s.token);
+  const setUser = (next: Partial<{ avatarUrl: string | null }>) => {
+    const cur = useAuth.getState().user;
+    if (!cur) return;
+    useAuth.setState({ user: { ...cur, ...next } });
+  };
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  function onPick(file: File) {
+  async function onPick(file: File) {
     if (!file.type.startsWith('image/')) {
-      alert('Please choose an image file.');
+      setErr('Please choose an image file.');
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      alert('Image must be under 2 MB.');
+    if (file.size > 4 * 1024 * 1024) {
+      setErr('Image must be under 4 MB.');
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = String(reader.result);
-      // Resize to 256x256 max to keep localStorage small.
-      const img = new Image();
-      img.onload = () => {
-        const max = 256;
-        const scale = Math.min(max / img.width, max / img.height, 1);
-        const w = Math.round(img.width * scale);
-        const h = Math.round(img.height * scale);
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          setAvatar(userId, dataUrl);
-        } else {
-          ctx.drawImage(img, 0, 0, w, h);
-          setAvatar(userId, canvas.toDataURL('image/jpeg', 0.85));
-        }
-        onChange();
-      };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
+    setErr(null);
+    setBusy(true);
+    try {
+      const dataUrl = await resizeToDataUrl(file, 256, 0.82);
+      if (!token) throw new Error('not signed in');
+      await api.setAvatar({ dataUrl }, token);
+      setUser({ avatarUrl: dataUrl });
+      onChange();
+    } catch (e) {
+      if (e instanceof ApiError && e.code === 'TOO_LARGE') {
+        setErr('Image is too large — try a smaller photo.');
+      } else {
+        setErr('Could not upload. Try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onRemove() {
+    if (!token) return;
+    setBusy(true);
+    try {
+      await api.removeAvatar(token);
+      setUser({ avatarUrl: null });
+      onChange();
+    } catch {
+      setErr('Could not remove. Try again.');
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
-    <div className="flex items-center justify-between gap-4 py-3 border-b border-parchment-300/70">
+    <div className="flex items-center justify-between gap-4 py-3 border-b border-parchment-300/70 flex-wrap">
       <div className="flex items-center gap-4">
-        <UserAvatar userId={userId} username={username} size={64} />
+        <UserAvatar
+          userId={userId}
+          username={username}
+          avatarUrl={avatarUrl}
+          size={64}
+        />
         <div>
           <div className="text-sm font-medium text-ink-900">Profile picture</div>
           <div className="text-xs text-ink-400 mt-0.5">
-            Shown in the nav bar and on your profile.
+            Shown in the nav bar and on your profile. Synced across devices.
           </div>
+          {err && <div className="text-xs text-danger mt-1">{err}</div>}
         </div>
       </div>
       <div className="flex gap-2">
-        <label className="rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft hover:opacity-90 transition cursor-pointer">
-          Upload
+        <label
+          className={`rounded-md bg-gold-shine px-4 py-2 text-xs font-medium uppercase tracking-wide text-parchment-50 shadow-soft transition cursor-pointer ${
+            busy ? 'opacity-50 pointer-events-none' : 'hover:opacity-90'
+          }`}
+        >
+          {busy ? 'Uploading.' : 'Upload'}
           <input
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
             className="hidden"
+            disabled={busy}
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) onPick(f);
+              if (f) void onPick(f);
               e.target.value = '';
             }}
           />
         </label>
-        {current && (
+        {avatarUrl && (
           <button
-            onClick={() => {
-              clearAvatar(userId);
-              onChange();
-            }}
-            className="rounded-md border border-parchment-400 px-4 py-2 text-xs text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
+            onClick={onRemove}
+            disabled={busy}
+            className="rounded-md border border-parchment-400 px-4 py-2 text-xs text-ink-600 hover:border-ink-900 hover:text-ink-900 transition disabled:opacity-50"
           >
             Remove
           </button>
@@ -435,6 +461,32 @@ function AvatarRow({
       </div>
     </div>
   );
+}
+
+/** Resize an image to fit inside `max`×`max`, encode as JPEG. */
+function resizeToDataUrl(file: File, max: number, quality: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(max / img.width, max / img.height, 1);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return resolve(String(reader.result));
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('image load failed'));
+      img.src = String(reader.result);
+    };
+    reader.onerror = () => reject(new Error('read failed'));
+    reader.readAsDataURL(file);
+  });
 }
 
 function Choice<T extends string>({
