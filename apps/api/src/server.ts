@@ -101,7 +101,7 @@ if (isMain) {
         const { prisma } = await import('@omnira/db');
         const r = await prisma.match.updateMany({
           where: { status: 'ACTIVE' },
-          data: { status: 'ABORTED', resultReason: 'ABANDONED', endedAt: new Date() },
+          data: { status: 'ABORTED', resultReason: 'ABANDONMENT', endedAt: new Date() },
         });
         if (r.count > 0) app.log.info({ count: r.count }, 'aborted orphan matches on boot');
       } catch (e) {

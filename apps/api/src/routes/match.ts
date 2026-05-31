@@ -28,7 +28,7 @@ export async function registerMatchRoutes(app: FastifyInstance) {
       // appearing in Watch and the user gets a clean lobby state.
       await prisma.match.update({
         where: { id: m.id },
-        data: { status: 'ABORTED', resultReason: 'ABANDONED', endedAt: new Date() },
+        data: { status: 'ABORTED', resultReason: 'ABANDONMENT', endedAt: new Date() },
       }).catch(() => {});
       return reply.send({ match: null });
     }
