@@ -9,6 +9,8 @@ import { useSocket } from '@/hooks/useSocket';
 import { MatchView } from '@/components/MatchView';
 import { PlaySidebar } from '@/components/PlaySidebar';
 import { api } from '@/lib/api';
+import { playSound, soundForSan } from '@/lib/sounds';
+import { useSettings } from '@/store/settings';
 
 export default function PlayPage() {
   const router = useRouter();
@@ -54,6 +56,8 @@ export default function PlayPage() {
   useEffect(() => {
     if (!socket || !user) return;
 
+    const soundOn = () => useSettings.getState().soundEnabled;
+
     const onStart = (p: {
       matchId: string;
       whitePlayerId: string;
@@ -63,6 +67,7 @@ export default function PlayPage() {
       incrementMs: number;
     }) => {
       m.onMatchStart({ ...p, myUserId: user.id });
+      if (soundOn()) playSound('matchStart');
     };
     const onMove = (p: {
       ply: number;
@@ -72,9 +77,25 @@ export default function PlayPage() {
       whiteMs: number;
       blackMs: number;
       turn: 'w' | 'b';
-    }) => m.onMatchMove(p);
-    const onEnd = (p: { outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW'; reason: string }) =>
+    }) => {
+      m.onMatchMove(p);
+      // Play AFTER updating the store so the board has already redrawn.
+      if (soundOn()) playSound(soundForSan(p.san));
+    };
+    const onEnd = (p: { outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW'; reason: string }) => {
       m.onMatchEnd(p);
+      if (!soundOn()) return;
+      const myColor = useMatch.getState().myColor;
+      if (p.outcome === 'DRAW') playSound('draw');
+      else if (
+        (p.outcome === 'WHITE_WON' && myColor === 'w') ||
+        (p.outcome === 'BLACK_WON' && myColor === 'b')
+      ) {
+        playSound('win');
+      } else {
+        playSound('loss');
+      }
+    };
     const onDrawOffer = (p: { from: string }) => {
       // The server sends the userId; translate to color.
       const myColor = m.myColor;

@@ -16,6 +16,8 @@ import { ExportWalletModal } from '@/components/ExportWalletModal';
 import { DeleteAccountModal } from '@/components/DeleteAccountModal';
 import { KeyRound, Trash2 } from 'lucide-react';
 import { api, ApiError } from '@/lib/api';
+import { playSound } from '@/lib/sounds';
+import { Volume2, VolumeX } from 'lucide-react';
 import {
   User,
   Wallet,
@@ -260,6 +262,14 @@ export default function SettingsPage() {
                   flash();
                 }}
               />
+              <SoundToggleRow
+                enabled={settings.soundEnabled}
+                onChange={(on) => {
+                  settings.setSoundEnabled(on);
+                  if (on) playSound('move');
+                  flash();
+                }}
+              />
             </Panel>
           )}
 
@@ -383,6 +393,49 @@ function Toggle({
           }`}
         />
       </button>
+    </div>
+  );
+}
+
+function SoundToggleRow({
+  enabled,
+  onChange,
+}: {
+  enabled: boolean;
+  onChange: (on: boolean) => void;
+}) {
+  return (
+    <div className="py-3 border-b border-parchment-300/70 last:border-b-0">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 rounded-md bg-parchment-50 border border-parchment-300 flex items-center justify-center text-gold-600">
+            {enabled ? (
+              <Volume2 size={16} strokeWidth={1.5} />
+            ) : (
+              <VolumeX size={16} strokeWidth={1.5} />
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-medium text-ink-900">Game sounds</div>
+            <div className="text-xs text-ink-400 mt-0.5">
+              Move, capture, check, and end-of-game cues.
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => onChange(!enabled)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+            enabled ? 'bg-gold-shine' : 'bg-parchment-400'
+          }`}
+          aria-pressed={enabled}
+        >
+          <span
+            className={`inline-block h-5 w-5 rounded-full bg-parchment-50 shadow transition transform ${
+              enabled ? 'translate-x-5' : 'translate-x-0.5'
+            }`}
+          />
+        </button>
+      </div>
     </div>
   );
 }

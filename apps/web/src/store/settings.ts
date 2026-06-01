@@ -148,11 +148,13 @@ interface SettingsState {
   language: Language;
   board: BoardStyle;
   pieceSet: PieceSet;
+  soundEnabled: boolean;
   /** base64 data-URL of uploaded avatar, keyed by userId */
   avatars: Record<string, string>;
   setLanguage: (l: Language) => void;
   setBoard: (b: BoardStyle) => void;
   setPieceSet: (p: PieceSet) => void;
+  setSoundEnabled: (on: boolean) => void;
   setAvatar: (userId: string, dataUrl: string) => void;
   clearAvatar: (userId: string) => void;
   t: (key: keyof Strings) => string;
@@ -164,6 +166,7 @@ export const useSettings = create<SettingsState>()(
       language: 'en',
       board: 'walnut',
       pieceSet: 'modern',
+      soundEnabled: true,
       avatars: {},
       setLanguage: (language) => {
         set({ language });
@@ -176,6 +179,7 @@ export const useSettings = create<SettingsState>()(
         applyBoard(board);
       },
       setPieceSet: (pieceSet) => set({ pieceSet }),
+      setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
       setAvatar: (userId, dataUrl) =>
         set((s) => ({ avatars: { ...s.avatars, [userId]: dataUrl } })),
       clearAvatar: (userId) =>

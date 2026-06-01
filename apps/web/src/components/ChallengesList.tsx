@@ -40,6 +40,7 @@ export function ChallengesList({ socket }: { socket: Socket }) {
   }, [socket, upsert, remove]);
 
   function accept(c: ApiChallenge) {
+    void import('@/lib/sounds').then((mod) => mod.primeAudio());
     socket.emit('challenge:accept', { code: c.code }, (ack: { ok: boolean; matchId?: string; error?: string }) => {
       if (!ack.ok) alert(ack.error ?? 'could not accept');
       // On success, `match:start` will be broadcast and the PlayPage hook routes the user.

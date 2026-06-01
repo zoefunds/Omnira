@@ -55,6 +55,7 @@ export default function PrivateChallengePage() {
 
   function accept() {
     if (!socket) return;
+    void import('@/lib/sounds').then((mod) => mod.primeAudio());
     socket.emit('challenge:accept', { code }, (ack: { ok: boolean; error?: string }) => {
       if (!ack.ok) setErr(ack.error ?? 'could not accept');
     });

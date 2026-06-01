@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { Socket } from 'socket.io-client';
 import { Button } from './Button';
 import { useMatch } from '@/store/match';
+import { primeAudio } from '@/lib/sounds';
 
 const TC = [
   { label: '1+0',  initialMs: 60_000,    incrementMs: 0,     category: 'Bullet' },
@@ -24,6 +25,7 @@ export function TimeControlPills({ socket }: { socket: Socket }) {
     setErr(null);
     setChosen(tc);
     setQueueStatus('waiting');
+    primeAudio(); // unlock audio while we still have a user gesture
     socket.emit('queue:join',
       { initialMs: tc.initialMs, incrementMs: tc.incrementMs },
       (ack: { ok: boolean; error?: string }) => {
