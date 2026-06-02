@@ -1,4 +1,5 @@
 import { prisma } from '@omnira/db';
+import type { Server } from 'socket.io';
 
 type Kind =
   | 'WELCOME'
@@ -9,6 +10,12 @@ type Kind =
   | 'FRIEND_ACTIVITY'
   | 'ANNOUNCEMENT';
 
+/** Socket.IO instance registered at boot so notify() can push live. */
+let io: Server | null = null;
+export function setNotificationIO(server: Server) {
+  io = server;
+}
+
 export async function notify(args: {
   userId: string;
   kind: Kind;
@@ -16,7 +23,7 @@ export async function notify(args: {
   body: string;
   href?: string;
 }) {
-  return prisma.notification.create({
+  const row = await prisma.notification.create({
     data: {
       userId: args.userId,
       kind: args.kind,
@@ -25,6 +32,10 @@ export async function notify(args: {
       href: args.href ?? null,
     },
   });
+  // Push to any open tabs the user has. Falls back to the next poll if the
+  // socket isn't attached yet.
+  io?.to(`user:${args.userId}`).emit('notification:new', row);
+  return row;
 }
 
 export async function listNotifications(userId: string, take = 30) {

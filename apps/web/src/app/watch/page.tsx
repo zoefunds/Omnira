@@ -49,7 +49,9 @@ export default function WatchPage() {
       }
     };
     void fetchOnce();
-    const id = setInterval(fetchOnce, 2_000);
+    // Refresh every 4 seconds. Server caches for 1.5s so we never thrash the
+    // DB regardless of viewer count.
+    const id = setInterval(fetchOnce, 4_000);
     return () => {
       cancelled = true;
       clearInterval(id);
@@ -66,33 +68,20 @@ export default function WatchPage() {
     RAPID: 0,
     CLASSICAL: 0,
   });
-  // Cheap polling per-category count so filter chips show live numbers.
+  // Single request returns ALL category counts, served from a 1.5s server
+  // cache. One round-trip every 5s regardless of viewer count.
   useEffect(() => {
     let cancelled = false;
     const pull = async () => {
       try {
-        const [all, bullet, blitz, rapid, classical] = await Promise.all([
-          api.listActiveSiteMatches({ pageSize: 1 }),
-          api.listActiveSiteMatches({ pageSize: 1, category: 'BULLET' }),
-          api.listActiveSiteMatches({ pageSize: 1, category: 'BLITZ' }),
-          api.listActiveSiteMatches({ pageSize: 1, category: 'RAPID' }),
-          api.listActiveSiteMatches({ pageSize: 1, category: 'CLASSICAL' }),
-        ]);
-        if (!cancelled) {
-          setCounts({
-            all: all.total,
-            BULLET: bullet.total,
-            BLITZ: blitz.total,
-            RAPID: rapid.total,
-            CLASSICAL: classical.total,
-          });
-        }
+        const r = await api.getMatchesSummary();
+        if (!cancelled) setCounts(r);
       } catch {
         /* ignore */
       }
     };
     void pull();
-    const id = setInterval(pull, 4_000);
+    const id = setInterval(pull, 5_000);
     return () => {
       cancelled = true;
       clearInterval(id);

@@ -3,6 +3,26 @@ import { prisma } from '@omnira/db';
 import { env } from '../config/env.js';
 import { getRoom, snapshotRoom, listLiveRoomIds } from '../match/runtime.js';
 
+/** In-process micro-cache for the spectator endpoints. With 150-300 viewers
+ *  polling every 2 seconds we'd otherwise hit Postgres ~150 times/sec — caching
+ *  for 1500 ms collapses that to under 1 query/sec. */
+type Cached<T> = { at: number; value: T };
+const CACHE_TTL_MS = 1500;
+const cache = new Map<string, Cached<unknown>>();
+
+function getCached<T>(key: string): T | undefined {
+  const c = cache.get(key) as Cached<T> | undefined;
+  if (!c) return undefined;
+  if (Date.now() - c.at > CACHE_TTL_MS) {
+    cache.delete(key);
+    return undefined;
+  }
+  return c.value;
+}
+function setCached<T>(key: string, value: T) {
+  cache.set(key, { at: Date.now(), value });
+}
+
 export async function registerMatchRoutes(app: FastifyInstance) {
 
   // Current active match for the signed-in user — used for rejoin after refresh.
@@ -35,19 +55,31 @@ export async function registerMatchRoutes(app: FastifyInstance) {
     return reply.send({ match: snapshotRoom(room) });
   });
 
-  app.get('/matches/active', { config: { rateLimit: false } }, async (req) => {
+  app.get('/matches/active', { config: { rateLimit: false } }, async (req, reply) => {
     const q = req.query as { page?: string; pageSize?: string; category?: string };
     const page = Math.max(1, Math.min(50, Number(q.page) || 1));
     const pageSize = Math.max(1, Math.min(60, Number(q.pageSize) || 24));
+    const cat = q.category && /^(BULLET|BLITZ|RAPID|CLASSICAL)$/.test(q.category) ? q.category : 'all';
+
+    const cacheKey = `active:${cat}:${page}:${pageSize}`;
+    const cached = getCached<unknown>(cacheKey);
+    if (cached) {
+      reply.header('x-cache', 'HIT');
+      return cached;
+    }
+
     const liveIds = listLiveRoomIds();
     if (liveIds.length === 0) {
-      return { matches: [], page, pageSize, total: 0, hasMore: false };
+      const empty = { matches: [], page, pageSize, total: 0, hasMore: false };
+      setCached(cacheKey, empty);
+      reply.header('x-cache', 'MISS');
+      return empty;
     }
     const where = {
       status: 'ACTIVE' as const,
       id: { in: liveIds },
-      ...(q.category && /^(BULLET|BLITZ|RAPID|CLASSICAL)$/.test(q.category)
-        ? { category: q.category as 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL' }
+      ...(cat !== 'all'
+        ? { category: cat as 'BULLET' | 'BLITZ' | 'RAPID' | 'CLASSICAL' }
         : {}),
     };
     const [total, rows] = await Promise.all([
@@ -84,13 +116,53 @@ export async function registerMatchRoutes(app: FastifyInstance) {
       currentFen: m.moves[0]?.fenAfter ?? null,
       ply: m.moves[0]?.ply ?? 0,
     }));
-    return {
+    const payload = {
       matches,
       page,
       pageSize,
       total,
       hasMore: page * pageSize < total,
     };
+    setCached(cacheKey, payload);
+    reply.header('x-cache', 'MISS');
+    return payload;
+  });
+
+  // Single round-trip for the spectator filter chips. Replaces five separate
+  // /matches/active?pageSize=1&category=... pings.
+  app.get('/matches/summary', { config: { rateLimit: false } }, async (_req, reply) => {
+    const cacheKey = 'summary';
+    const cached = getCached<unknown>(cacheKey);
+    if (cached) {
+      reply.header('x-cache', 'HIT');
+      return cached;
+    }
+    const liveIds = listLiveRoomIds();
+    if (liveIds.length === 0) {
+      const empty = { all: 0, BULLET: 0, BLITZ: 0, RAPID: 0, CLASSICAL: 0 };
+      setCached(cacheKey, empty);
+      reply.header('x-cache', 'MISS');
+      return empty;
+    }
+    const rows = await prisma.match.groupBy({
+      by: ['category'],
+      where: { status: 'ACTIVE', id: { in: liveIds } },
+      _count: { _all: true },
+    });
+    const counts: Record<string, number> = {
+      all: 0,
+      BULLET: 0,
+      BLITZ: 0,
+      RAPID: 0,
+      CLASSICAL: 0,
+    };
+    for (const r of rows) {
+      counts[r.category] = r._count._all;
+      counts.all += r._count._all;
+    }
+    setCached(cacheKey, counts);
+    reply.header('x-cache', 'MISS');
+    return counts;
   });
 
   app.get('/match/:id', { config: { rateLimit: false } }, async (req, reply) => {

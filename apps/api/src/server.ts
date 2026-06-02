@@ -17,6 +17,7 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerPuzzleRoutes } from './routes/puzzles.js';
 import { registerWalletRoutes } from './routes/wallet.js';
 import { registerNotificationRoutes } from './routes/notifications.js';
+import { setNotificationIO } from './notifications/service.js';
 import { attachRealtime } from './realtime/socket.js';
 import { spawnMatch } from './match/runtime.js';
 import { startTournamentRuntime } from './tournaments/runtime.js';
@@ -29,8 +30,34 @@ export async function buildServer() {
 
   await app.register(sensible);
   await app.register(helmet, { contentSecurityPolicy: false });
-  await app.register(cors, { origin: true, credentials: true });
-  await app.register(rateLimit, { max: 600, timeWindow: '1 minute' });
+  await app.register(cors, {
+    origin: true,
+    credentials: true,
+    maxAge: 86400, // cache CORS preflights for 24h to cut option-request load
+  });
+  // Compress JSON bodies (most of our endpoints) to cut bandwidth ~3-5x
+  // on the spectator + profile pages where payloads can be a few KB.
+  // Dynamic import + fail-soft so the bundle still runs without the plugin.
+  try {
+    const compress = (await import('@fastify/compress')).default;
+    await app.register(compress, { global: true, threshold: 1024 });
+  } catch {
+    app.log.warn('@fastify/compress not installed — bodies will not be gzipped');
+  }
+  // Global rate-limit raised for 200-300 concurrent users. Each user can
+  // emit short bursts (queue join, lobby refresh, notification poll) without
+  // tripping; per-route TIGHT_RL still applies on auth endpoints.
+  await app.register(rateLimit, {
+    max: 2000,
+    timeWindow: '1 minute',
+    keyGenerator: (req) => {
+      // Prefer the JWT sub when available so multiple tabs from the same IP
+      // (a single user opening Watch + Lobby) don't trample each other.
+      const auth = req.headers.authorization;
+      if (auth?.startsWith('Bearer ')) return `u:${auth.slice(7, 39)}`;
+      return req.ip;
+    },
+  });
   await app.register(jwt, { secret: cfg.JWT_SECRET });
 
   app.get('/health', async () => ({ ok: true, ts: Date.now() }));
@@ -82,6 +109,7 @@ export async function buildServer() {
   // Force fastify to instantiate the underlying http server before we attach socket.io
   await app.ready();
   const io = attachRealtime(app);
+  setNotificationIO(io);
   startTournamentRuntime(io, async (args) => spawnMatch(args));
 
   // Expose for shutdown

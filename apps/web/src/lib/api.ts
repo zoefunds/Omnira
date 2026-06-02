@@ -448,6 +448,12 @@ export interface ApiMatchState {
   moves: Array<{ ply: number; san: string; uci: string; fenAfter: string; clockMsWhite: number; clockMsBlack: number }>;
 }
 
+api.getMatchesSummary = () =>
+  request<{ all: number; BULLET: number; BLITZ: number; RAPID: number; CLASSICAL: number }>(
+    '/matches/summary',
+    { method: 'GET' },
+  );
+
 api.listActiveSiteMatches = (opts?: {
   page?: number;
   pageSize?: number;

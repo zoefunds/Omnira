@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { api, type ApiNotification } from '@/lib/api';
 import { useAuth } from '@/store/auth';
+import { useSocket } from '@/hooks/useSocket';
 
 const ICON: Record<ApiNotification['kind'], React.ReactNode> = {
   WELCOME: <Sparkles size={16} className="text-gold-600" strokeWidth={1.5} />,
@@ -38,6 +39,7 @@ function relativeTime(iso: string): string {
 
 export function NotificationsMenu() {
   const token = useAuth((s) => s.token);
+  const socket = useSocket(token);
   const [open, setOpen] = useState(false);
   const [notes, setNotes] = useState<ApiNotification[]>([]);
   const [unread, setUnread] = useState(0);
@@ -53,7 +55,9 @@ export function NotificationsMenu() {
     return () => document.removeEventListener('mousedown', onDoc);
   }, []);
 
-  // Poll for new notifications every 30s. Refetch immediately on open.
+  // Live push: server emits 'notification:new' whenever notify() runs.
+  // Backstop with a low-frequency poll (5 min) in case a socket reconnect
+  // missed an event.
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -69,12 +73,25 @@ export function NotificationsMenu() {
       }
     };
     void pull();
-    const id = setInterval(pull, 30_000);
+    const id = setInterval(pull, 5 * 60_000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
   }, [token]);
+
+  // Server push: merge new notifications into the list as they arrive.
+  useEffect(() => {
+    if (!socket) return;
+    const onNew = (n: ApiNotification) => {
+      setNotes((arr) => (arr.some((x) => x.id === n.id) ? arr : [n, ...arr].slice(0, 30)));
+      setUnread((u) => u + 1);
+    };
+    socket.on('notification:new', onNew);
+    return () => {
+      socket.off('notification:new', onNew);
+    };
+  }, [socket]);
 
   useEffect(() => {
     if (!open || !token) return;
