@@ -131,16 +131,17 @@ export function isReady(tournamentId: string, userId: string) {
  * We sort by score desc and greedily pair adjacent compatible players.
  */
 /**
- * For each player in the candidate list, find the userId of their most
- * recent opponent within this tournament. Used to break the rematch loop
- * that otherwise pairs two finishers back together immediately.
+ * For each player in the candidate list, return the userIds of their last
+ * TWO opponents within this tournament. Used to break the rematch loop —
+ * we avoid the most recent and second-most-recent opponent when possible,
+ * so a 3-player rotation cycles A→B, B→C, C→A correctly instead of
+ * thrashing between the same two players.
  */
-async function getLastOpponentMap(
+async function getRecentOpponentsMap(
   tournamentId: string,
   userIds: string[],
-): Promise<Map<string, string>> {
+): Promise<Map<string, Set<string>>> {
   if (userIds.length === 0) return new Map();
-  // Pull the most recent match per player. One query is fine at this scale.
   const recent = await prisma.match.findMany({
     where: {
       tournamentId,
@@ -148,13 +149,23 @@ async function getLastOpponentMap(
       status: { in: ['ACTIVE', 'WHITE_WON', 'BLACK_WON', 'DRAW'] },
     },
     orderBy: { startedAt: 'desc' },
-    select: { whitePlayerId: true, blackPlayerId: true, startedAt: true },
-    take: userIds.length * 4, // each player can appear in many matches; we just need the freshest
+    select: { whitePlayerId: true, blackPlayerId: true },
+    take: userIds.length * 6,
   });
-  const map = new Map<string, string>();
+  const map = new Map<string, Set<string>>();
+  const cap = 2;
   for (const m of recent) {
-    if (!map.has(m.whitePlayerId)) map.set(m.whitePlayerId, m.blackPlayerId);
-    if (!map.has(m.blackPlayerId)) map.set(m.blackPlayerId, m.whitePlayerId);
+    for (const [self, opp] of [
+      [m.whitePlayerId, m.blackPlayerId],
+      [m.blackPlayerId, m.whitePlayerId],
+    ] as const) {
+      let s = map.get(self);
+      if (!s) {
+        s = new Set();
+        map.set(self, s);
+      }
+      if (s.size < cap) s.add(opp);
+    }
   }
   return map;
 }
@@ -210,27 +221,31 @@ async function pairOneActiveTournamentInner(
 
   if (eligible.length < 2) return;
 
-  // Lichess-style anti-rematch: for each candidate pair (i, i+1) in the
-  // score-sorted list, look up the previous opponent of player i. If it's
-  // player i+1 *and* there's another option available, slide i+1 down the
-  // list one slot. Avoids the "same two players paired N times in a row" bug
-  // we hit after auto-rejoin pool started instantly re-queueing finishers.
-  const lastOpponent = await getLastOpponentMap(tournamentId, eligible.map((e) => e.userId));
+  // Anti-rematch: avoid each player's TWO most recent opponents when
+  // possible. With a 3+ player pool this rotates the field cleanly. The
+  // fallback only kicks in when no fresh opponent exists at all (e.g. only
+  // two players in the arena — rematch is unavoidable).
+  const recentOpponents = await getRecentOpponentsMap(
+    tournamentId,
+    eligible.map((e) => e.userId),
+  );
 
   const paired = new Set<string>();
   const pairs: Array<{ a: { userId: string }; b: { userId: string } }> = [];
   for (let i = 0; i < eligible.length; i++) {
     const a = eligible[i]!;
     if (paired.has(a.userId)) continue;
-    // Find the first remaining player who isn't a's last opponent, falling
-    // back to the next available if no such candidate exists.
+    const aRecent = recentOpponents.get(a.userId) ?? new Set<string>();
+    // Find the first remaining player who isn't in either of our recent-
+    // opponents sets (a's or theirs), falling back if no such candidate.
     let bIdx = -1;
     let fallbackIdx = -1;
     for (let j = i + 1; j < eligible.length; j++) {
       const cand = eligible[j]!;
       if (paired.has(cand.userId)) continue;
       if (fallbackIdx === -1) fallbackIdx = j;
-      if (lastOpponent.get(a.userId) !== cand.userId) {
+      const candRecent = recentOpponents.get(cand.userId) ?? new Set<string>();
+      if (!aRecent.has(cand.userId) && !candRecent.has(a.userId)) {
         bIdx = j;
         break;
       }
