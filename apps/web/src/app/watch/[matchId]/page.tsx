@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { api, type ApiMatchState } from '@/lib/api';
 import { useAuth } from '@/store/auth';
 import { useSocket } from '@/hooks/useSocket';
+import { CopyTxHash } from '@/components/CopyTxHash';
 
 const Chessboard = dynamic(() => import('react-chessboard').then((m) => m.Chessboard), { ssr: false });
 
@@ -121,13 +122,33 @@ export default function WatchMatchPage() {
           <span className="font-mono text-ink-900">{fmtMs(whiteMs)}</span>
         </div>
 
-        <div className="mt-3 text-xs text-ink-400 flex items-center gap-4">
+        <div className="mt-3 text-xs text-ink-400 flex items-center gap-4 flex-wrap">
           <span>{fmtTC(m.initialTimeSec, m.incrementSec)} · {m.category.toLowerCase()}</span>
           {ended && <span className="text-ink-900">{m.status.replace('_', ' ').toLowerCase()} · {m.resultReason?.toLowerCase()}</span>}
           {m.tournamentId && (
             <Link href={`/tournaments/${m.tournamentId}`} className="text-accent hover:underline">tournament</Link>
           )}
         </div>
+
+        {/* Onchain hashes, if any */}
+        {(m.onchainTxHash || m.onchainMatchId) && (
+          <div className="mt-3 rounded-md border border-parchment-300 bg-parchment-50 p-3 text-xs text-ink-600">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              {m.onchainMatchId && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-ink-400">match id</span>
+                  <CopyTxHash value={m.onchainMatchId} />
+                </div>
+              )}
+              {m.onchainTxHash && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-ink-400">finalize tx</span>
+                  <CopyTxHash value={m.onchainTxHash} />
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       <aside className="w-full lg:w-72 rounded-xl border border-parchment-300 bg-parchment-100 p-4">

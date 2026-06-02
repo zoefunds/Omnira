@@ -10,6 +10,7 @@ import { Button } from '@/components/Button';
 import { TournamentPairingCard } from '@/components/TournamentPairingCard';
 import { TournamentActiveMatches } from '@/components/TournamentActiveMatches';
 import { TournamentPodium } from '@/components/TournamentPodium';
+import { CopyTxHash } from '@/components/CopyTxHash';
 
 function fmtTC(initialMs: number, incrementMs: number) {
   return `${Math.round(initialMs / 60_000)}+${Math.round(incrementMs / 1000)}`;
@@ -169,16 +170,16 @@ export default function TournamentPage() {
 
       <div data-onchain-strip className="rounded-xl border border-parchment-300 bg-parchment-50 p-3 text-xs text-ink-600">
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <div>
-            <span className="text-ink-400 mr-1">register tx</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-400">register tx</span>
             {(t as unknown as { onchainTxHash?: string | null }).onchainTxHash
-              ? <span className="font-mono text-ink-900">{(t as unknown as { onchainTxHash?: string }).onchainTxHash!.slice(0, 10)}…{(t as unknown as { onchainTxHash?: string }).onchainTxHash!.slice(-6)}</span>
+              ? <CopyTxHash value={(t as unknown as { onchainTxHash: string }).onchainTxHash} />
               : <span className="text-ink-400">pending</span>}
           </div>
-          <div>
-            <span className="text-ink-400 mr-1">final tx</span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-ink-400">final tx</span>
             {(t as unknown as { onchainSettledTxHash?: string | null }).onchainSettledTxHash
-              ? <span className="font-mono text-ink-900">{(t as unknown as { onchainSettledTxHash?: string }).onchainSettledTxHash!.slice(0, 10)}…{(t as unknown as { onchainSettledTxHash?: string }).onchainSettledTxHash!.slice(-6)}</span>
+              ? <CopyTxHash value={(t as unknown as { onchainSettledTxHash: string }).onchainSettledTxHash} />
               : <span className="text-ink-400">{t.status === 'FINISHED' ? 'pending' : '·'}</span>}
           </div>
         </div>

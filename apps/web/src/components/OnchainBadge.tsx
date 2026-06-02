@@ -3,10 +3,7 @@
 import { useEffect } from 'react';
 import { API_BASE } from '@/lib/config';
 import { useMatch } from '@/store/match';
-
-function short(tx: string) {
-  return `${tx.slice(0, 10)}…${tx.slice(-6)}`;
-}
+import { CopyTxHash } from './CopyTxHash';
 
 export function OnchainBadge() {
   const { matchId, ended, chain, setChain } = useMatch();
@@ -68,8 +65,9 @@ export function OnchainBadge() {
           {settled ? 'Recorded onchain' : 'Recording onchain…'}
         </span>
       </div>
-      <div className="mt-1.5 font-mono break-all">
-        match tx <span className="text-ink-900">{short(chain.matchTx)}</span>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <span className="text-ink-400">match tx</span>
+        <CopyTxHash value={chain.matchTx} />
       </div>
     </div>
   );
