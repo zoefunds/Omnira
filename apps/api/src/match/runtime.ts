@@ -34,6 +34,10 @@ export interface MatchRoom {
    *  FIRST_MOVE_TIMEOUT_MS. Re-armed after the first move; cleared when the
    *  game is over. */
   firstMoveTimer: NodeJS.Timeout | null;
+  /** Timer scheduled to fire when the side-to-move would run out of time.
+   *  Re-armed every move so a server-driven flag-fall still happens even if
+   *  the opponent never touches the board. */
+  flagFallTimer: NodeJS.Timeout | null;
 }
 
 /** Each side gets 15 seconds to play their first/second move or they forfeit
@@ -88,9 +92,11 @@ export async function spawnMatch(args: {
     ended: false,
     drawOfferFrom: null,
     firstMoveTimer: null,
+    flagFallTimer: null,
   };
   rooms.set(room.id, room);
   armFirstMoveTimer(room);
+  armFlagFallTimer(room);
   // fire-and-forget onchain registration
   void enqueueRegister({
     matchId: room.id,
@@ -166,6 +172,11 @@ export async function playMove(
   }
   if (result.ply === 1) armFirstMoveTimer(room);
 
+  // Re-arm the flag-fall timer for the *new* side-to-move. Without this the
+  // opponent's clock could hit zero with no detection because flag-fall is
+  // only checked on move-receipt.
+  armFlagFallTimer(room);
+
   await recordMove({
     matchId: room.id,
     ply: result.ply,
@@ -240,6 +251,10 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
     clearTimeout(room.firstMoveTimer);
     room.firstMoveTimer = null;
   }
+  if (room.flagFallTimer) {
+    clearTimeout(room.flagFallTimer);
+    room.flagFallTimer = null;
+  }
 
   const elo = applyElo(
     { rating: room.whiteRatingBefore, gamesPlayed: 0 },
@@ -303,11 +318,61 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
 }
 
 /** Caller (socket.ts) registers a callback so the runtime can broadcast a
- *  game-over event for no-show forfeits without importing the io instance. */
-type EndBroadcaster = (room: MatchRoom, outcome: 'WHITE_WON' | 'BLACK_WON', reason: 'NO_SHOW') => void;
+ *  game-over event for forfeits and flag-falls that happen off the move path. */
+type EndBroadcaster = (
+  room: MatchRoom,
+  outcome: 'WHITE_WON' | 'BLACK_WON' | 'DRAW',
+  reason: 'NO_SHOW' | 'TIMEOUT' | 'ABANDONMENT',
+) => void;
 let endBroadcaster: EndBroadcaster | null = null;
 export function setMatchEndBroadcaster(fn: EndBroadcaster) {
   endBroadcaster = fn;
+}
+
+/**
+ * Schedule a server-side flag-fall for the side-to-move. Fires when their
+ * remaining clock would hit zero. Must be re-armed after every move because
+ * the active side and their remaining time both change.
+ *
+ * Without this, a player could let their opponent's clock run to zero
+ * indefinitely without ever triggering a result — the existing isFlagged
+ * check only ran inside `playMove`.
+ */
+function armFlagFallTimer(room: MatchRoom) {
+  if (room.flagFallTimer) {
+    clearTimeout(room.flagFallTimer);
+    room.flagFallTimer = null;
+  }
+  if (room.ended) return;
+  // We don't run the flag-fall timer until BOTH players have made their first
+  // move — the firstMoveTimer covers no-show forfeits before then. Once ply
+  // ≥ 2 the regular clock owns the game.
+  if (room.ply < 1) return;
+
+  const live = remainingMs(room.clock, Date.now());
+  const sideToMove = room.game.turn();
+  const ms = sideToMove === 'w' ? live.whiteMs : live.blackMs;
+  if (ms <= 0) {
+    // Already flagged — fire on the next tick rather than synchronously.
+    setImmediate(() => void fireFlagFall(room));
+    return;
+  }
+  room.flagFallTimer = setTimeout(() => void fireFlagFall(room), ms + 50);
+}
+
+async function fireFlagFall(room: MatchRoom) {
+  if (room.ended) return;
+  const now = Date.now();
+  const flagged = isFlagged(room.clock, now);
+  if (!flagged) {
+    // False alarm (e.g. opponent moved in the same tick). Re-arm.
+    armFlagFallTimer(room);
+    return;
+  }
+  await finalizeOnTimeout(room, flagged, now);
+  const outcome: 'WHITE_WON' | 'BLACK_WON' =
+    flagged === 'w' ? 'BLACK_WON' : 'WHITE_WON';
+  endBroadcaster?.(room, outcome, 'TIMEOUT');
 }
 
 function armFirstMoveTimer(room: MatchRoom) {
