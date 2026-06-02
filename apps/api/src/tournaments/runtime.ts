@@ -10,6 +10,39 @@ import { prisma as _prisma } from '@omnira/db';
  * In-memory because Phase 11B is single-server. Redis-backed in Phase 13 if we scale.
  */
 const ready: Map<string /*tournamentId*/, Set<string /*userId*/>> = new Map();
+/**
+ * Per-tournament pairing lock. Prevents two concurrent passes of
+ * `pairOneActiveTournament` from picking the same eligible player twice
+ * before the first pass has had time to call `markInGameStart`.
+ *
+ * Symptom we hit without this: the moment a fresh match started, the same
+ * two players were re-paired against each other, the server emitted a second
+ * `match:start`, and the client overwrote the board with another fresh
+ * starting position. Visible as "the board resets after a move or two".
+ */
+const pairLocks: Map<string, Promise<void>> = new Map();
+
+async function withPairLock(
+  tournamentId: string,
+  fn: () => Promise<void>,
+): Promise<void> {
+  const previous = pairLocks.get(tournamentId);
+  let release: () => void = () => {};
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Chain so that if a pair is in-flight, we wait for it before starting.
+  const chained = (previous ?? Promise.resolve()).then(async () => {
+    try { await fn(); } finally { release(); }
+  });
+  pairLocks.set(tournamentId, chained);
+  // Clean the map when nothing is pending so it doesn't grow forever.
+  chained.then(() => {
+    if (pairLocks.get(tournamentId) === chained) pairLocks.delete(tournamentId);
+  });
+  await chained;
+}
+
 /** After a tournament game ends, both players sit out the pairing pool for
  *  this many ms so they can see the result before the next board appears. */
 export const POST_GAME_COOLDOWN_MS = 5_000;
@@ -137,6 +170,23 @@ async function pairOneActiveTournament(
     tournamentId: string;
   }) => Promise<{ id: string; game: { fen: () => string } }>,
 ): Promise<void> {
+  // Serialize per tournament so two passes never race on the same ready set.
+  return withPairLock(tournamentId, () =>
+    pairOneActiveTournamentInner(tournamentId, io, spawnMatchFn),
+  );
+}
+
+async function pairOneActiveTournamentInner(
+  tournamentId: string,
+  io: Server,
+  spawnMatchFn: (args: {
+    whitePlayerId: string;
+    blackPlayerId: string;
+    initialMs: number;
+    incrementMs: number;
+    tournamentId: string;
+  }) => Promise<{ id: string; game: { fen: () => string } }>,
+): Promise<void> {
   const t = await prisma.tournament.findUnique({
     where: { id: tournamentId },
     select: { id: true, status: true, initialMs: true, incrementMs: true },
@@ -199,6 +249,14 @@ async function pairOneActiveTournament(
     const whitePlayerId = whiteFirst ? a.userId : b.userId;
     const blackPlayerId = whiteFirst ? b.userId : a.userId;
 
+    // Critical ordering: claim BOTH players into the in-game set BEFORE
+    // awaiting spawn. If we awaited first, a concurrent eager-pair could
+    // see them still in `ready` and pair them again — which manifested as
+    // the board "resetting to the starting position" right after each game
+    // started.
+    markInGameStart(tournamentId, whitePlayerId);
+    markInGameStart(tournamentId, blackPlayerId);
+
     try {
       const room = await spawnMatchFn({
         whitePlayerId,
@@ -207,8 +265,6 @@ async function pairOneActiveTournament(
         incrementMs: t.incrementMs,
         tournamentId,
       });
-      markInGameStart(tournamentId, whitePlayerId);
-      markInGameStart(tournamentId, blackPlayerId);
 
       const [wpt, bpt] = await Promise.all([
         prisma.user.findUnique({ where: { id: whitePlayerId }, select: { username: true } }),
@@ -238,6 +294,12 @@ async function pairOneActiveTournament(
         matchId: room.id, whitePlayerId, blackPlayerId,
       });
     } catch (e) {
+      // Roll back so the failed pair doesn't strand the players outside the pool.
+      markInGameEnd(tournamentId, whitePlayerId);
+      markInGameEnd(tournamentId, blackPlayerId);
+      // Put them back into ready so the next tick can retry.
+      getReady(tournamentId).add(whitePlayerId);
+      getReady(tournamentId).add(blackPlayerId);
       console.error('tournament pair failed', { tournamentId, err: (e as Error).message });
     }
   }
