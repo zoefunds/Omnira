@@ -42,6 +42,15 @@ export async function registerChallengeRoutes(app: FastifyInstance) {
     if (!parsed.success) {
       return reply.code(400).send({ error: 'INVALID_BODY', issues: parsed.error.flatten() });
     }
+    // Block unverified users from creating challenges.
+    const { prisma } = await import('@omnira/db');
+    const me = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { emailVerified: true },
+    });
+    if (!me?.emailVerified) {
+      return reply.code(403).send({ error: 'EMAIL_NOT_VERIFIED' });
+    }
     try {
       const ch = await createChallenge({ creatorId: req.user.sub, ...parsed.data });
       // Broadcast to lobby subscribers via Socket.IO

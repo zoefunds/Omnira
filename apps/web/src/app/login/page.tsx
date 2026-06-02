@@ -66,7 +66,7 @@ function LoginPage() {
     try {
       const res = await api.login(form);
       setSession({ token: res.token, user: res.user });
-      router.push(nextHref);
+      router.push(res.user.emailVerified ? nextHref : '/verify-pending');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'INVALID_CREDENTIALS') {
         setError('Invalid email/username or password.');

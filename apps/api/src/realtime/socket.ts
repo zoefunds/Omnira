@@ -37,8 +37,20 @@ export function attachRealtime(app: FastifyInstance): Server {
     const userId = s.data.userId;
     s.join(`user:${userId}`);
 
+    /** Reject events from users whose email isn't verified yet. */
+    async function requireVerified(): Promise<boolean> {
+      const u = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { emailVerified: true },
+      });
+      return Boolean(u?.emailVerified);
+    }
+
     s.on('queue:join', async (payload: { initialMs: number; incrementMs: number }, ack) => {
       try {
+        if (!(await requireVerified())) {
+          return ack?.({ ok: false, error: 'EMAIL_NOT_VERIFIED' });
+        }
         const ratings = await prisma.rating.findMany({ where: { userId } });
         // Use the rating that matches the bucket's category. For simplicity, average for now.
         const rating = ratings.length
@@ -220,6 +232,9 @@ export function attachRealtime(app: FastifyInstance): Server {
 
     s.on('challenge:accept', async (payload: { code: string }, ack) => {
       try {
+        if (!(await requireVerified())) {
+          return ack?.({ ok: false, error: 'EMAIL_NOT_VERIFIED' });
+        }
         const ch = await acceptChallenge(payload.code, userId);
         const { whitePlayerId, blackPlayerId } = resolveColors(
           ch.creatorId,

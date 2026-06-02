@@ -75,6 +75,14 @@ export async function registerTournamentRoutes(app: FastifyInstance) {
     try { await req.jwtVerify(); } catch { return reply.code(401).send({ error: 'UNAUTHORIZED' }); }
     const parsed = CreateBody.safeParse(req.body);
     if (!parsed.success) return reply.code(400).send({ error: 'INVALID_BODY', issues: parsed.error.flatten() });
+    const { prisma } = await import('@omnira/db');
+    const me = await prisma.user.findUnique({
+      where: { id: req.user.sub },
+      select: { emailVerified: true },
+    });
+    if (!me?.emailVerified) {
+      return reply.code(403).send({ error: 'EMAIL_NOT_VERIFIED' });
+    }
     try {
       const t = await createTournament({
         creatorId: req.user.sub,

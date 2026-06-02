@@ -66,7 +66,11 @@ function SignupPage() {
     try {
       const res = await api.signup(form);
       setSession({ token: res.token, user: res.user });
-      router.push(nextHref);
+      // Server kicks off the verification email asynchronously; new accounts
+      // must verify before reaching protected routes. AuthGuard would
+      // redirect them anyway, but we send them straight to the pending page
+      // so they don't see a flash of the destination first.
+      router.push(res.user.emailVerified ? nextHref : '/verify-pending');
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.code === 'EMAIL_TAKEN') setErrors({ email: 'already in use' });

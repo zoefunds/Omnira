@@ -10,6 +10,29 @@ import { disconnectSocket } from '@/lib/socket';
 const REVALIDATE_INTERVAL_MS = 5 * 60_000; // 5 minutes
 
 /**
+ * Paths an UNVERIFIED user is allowed to visit. Anything outside this list
+ * triggers a redirect to /verify-pending.
+ */
+const UNVERIFIED_ALLOWED = new Set<string>([
+  '/',
+  '/login',
+  '/signup',
+  '/verify',
+  '/verify-pending',
+  '/forgot-password',
+  '/reset',
+]);
+
+function isUnverifiedAllowed(pathname: string | null): boolean {
+  if (!pathname) return false;
+  if (UNVERIFIED_ALLOWED.has(pathname)) return true;
+  // Allow nested sub-paths under permitted prefixes too.
+  return Array.from(UNVERIFIED_ALLOWED).some(
+    (p) => p !== '/' && pathname.startsWith(p + '/'),
+  );
+}
+
+/**
  * Runs once per page load after the auth store rehydrates from localStorage.
  * Calls /auth/me with the stored token. If the user no longer exists or the
  * token is invalid, wipes the local session and bounces the user to /login.
@@ -57,6 +80,17 @@ export function AuthGuard() {
   useEffect(() => {
     if (hydrated && token && user) void revalidate();
   }, [hydrated, token, user, revalidate]);
+
+  // Gate access for unverified accounts. Anyone with `emailVerified: false`
+  // is bounced to /verify-pending unless they're on an explicitly-allowed
+  // path (verify, settings, sign in/up, etc.).
+  useEffect(() => {
+    if (!hydrated || !user) return;
+    if (user.emailVerified) return;
+    if (!isUnverifiedAllowed(pathname)) {
+      router.replace('/verify-pending');
+    }
+  }, [hydrated, user, pathname, router]);
 
   // Revalidate every time the tab regains focus or visibility, and on a
   // 5-minute interval. The internal `lastValidatedAt` clamp coalesces these
