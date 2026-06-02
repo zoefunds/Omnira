@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { Server, type Socket } from 'socket.io';
 import { joinOrMatch, leaveQueue } from '../matchmaking/queue.js';
-import { spawnMatch, getRoom, playMove, resign, offerDraw, acceptDraw } from '../match/runtime.js';
+import { spawnMatch, getRoom, playMove, resign, offerDraw, acceptDraw, setMatchEndBroadcaster } from '../match/runtime.js';
 import { prisma } from '@omnira/db';
 import { acceptChallenge, resolveColors, linkMatch, ChallengeError } from '../lobby/service.js';
 import { postMessage, ChatError } from '../chat/service.js';
@@ -82,14 +82,22 @@ export function attachRealtime(app: FastifyInstance): Server {
           incrementMs: payload.incrementMs,
         });
 
+        const [wp, bp] = await Promise.all([
+          prisma.user.findUnique({ where: { id: whitePlayerId }, select: { username: true } }),
+          prisma.user.findUnique({ where: { id: blackPlayerId }, select: { username: true } }),
+        ]);
         const start = {
           matchId: room.id,
           whitePlayerId,
           blackPlayerId,
+          whiteUsername: wp?.username ?? null,
+          blackUsername: bp?.username ?? null,
           initialMs: payload.initialMs,
           incrementMs: payload.incrementMs,
           fen: room.game.fen(),
           startedAt: Date.now(),
+          // Echo the queue settings so the client can auto-rejoin on game end.
+          queueRejoin: { initialMs: payload.initialMs, incrementMs: payload.incrementMs },
         };
 
         io.to(`user:${whitePlayerId}`).to(`user:${blackPlayerId}`).emit('match:start', start);
@@ -250,10 +258,16 @@ export function attachRealtime(app: FastifyInstance): Server {
         });
         await linkMatch(ch.id, room.id);
 
+        const [wp2, bp2] = await Promise.all([
+          prisma.user.findUnique({ where: { id: whitePlayerId }, select: { username: true } }),
+          prisma.user.findUnique({ where: { id: blackPlayerId }, select: { username: true } }),
+        ]);
         const start = {
           matchId: room.id,
           whitePlayerId,
           blackPlayerId,
+          whiteUsername: wp2?.username ?? null,
+          blackUsername: bp2?.username ?? null,
           initialMs: ch.initialMs,
           incrementMs: ch.incrementMs,
           fen: room.game.fen(),
@@ -294,6 +308,15 @@ export function attachRealtime(app: FastifyInstance): Server {
     });
 
 
+  });
+
+  // Allow the match runtime to broadcast no-show forfeits back through io.
+  setMatchEndBroadcaster((room, outcome, reason) => {
+    io.to(`match:${room.id}`).emit('match:end', {
+      matchId: room.id,
+      outcome,
+      reason,
+    });
   });
 
   return io;

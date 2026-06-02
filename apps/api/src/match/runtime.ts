@@ -30,7 +30,15 @@ export interface MatchRoom {
   blackRatingBefore: number;
   ended: boolean;
   drawOfferFrom: Color | null;
+  /** Timer that auto-forfeits if the next-to-move side hasn't played within
+   *  FIRST_MOVE_TIMEOUT_MS. Re-armed after the first move; cleared when the
+   *  game is over. */
+  firstMoveTimer: NodeJS.Timeout | null;
 }
+
+/** Each side gets 15 seconds to play their first/second move or they forfeit
+ *  (lichess "no-show" pattern). Cleared after black plays move 2. */
+export const FIRST_MOVE_TIMEOUT_MS = 15_000;
 
 const rooms = new Map<string, MatchRoom>();
 
@@ -79,8 +87,10 @@ export async function spawnMatch(args: {
     blackRatingBefore: bRating,
     ended: false,
     drawOfferFrom: null,
+    firstMoveTimer: null,
   };
   rooms.set(room.id, room);
+  armFirstMoveTimer(room);
   // fire-and-forget onchain registration
   void enqueueRegister({
     matchId: room.id,
@@ -146,6 +156,15 @@ export async function playMove(
   room.clock = clockUpdate.next;
   room.ply = result.ply;
   room.drawOfferFrom = null;
+
+  // First-move forfeit handling. After white plays move 1, re-arm for black's
+  // move 2. After black plays move 2, the clock has fully started and the
+  // normal timeout machinery takes over.
+  if (room.firstMoveTimer && (result.ply === 1 || result.ply >= 2)) {
+    clearTimeout(room.firstMoveTimer);
+    room.firstMoveTimer = null;
+  }
+  if (result.ply === 1) armFirstMoveTimer(room);
 
   await recordMove({
     matchId: room.id,
@@ -217,6 +236,10 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
   if (room.ended) return;
   room.ended = true;
   room.clock = stopClock(room.clock, now);
+  if (room.firstMoveTimer) {
+    clearTimeout(room.firstMoveTimer);
+    room.firstMoveTimer = null;
+  }
 
   const elo = applyElo(
     { rating: room.whiteRatingBefore, gamesPlayed: 0 },
@@ -259,13 +282,47 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
       });
       markInGameEnd(room.tournamentId, room.whitePlayerId);
       markInGameEnd(room.tournamentId, room.blackPlayerId);
-      const { broadcastStandings, broadcastQueueSummary } = await import('../tournaments/runtime.js');
+      // Lichess-arena behavior: both players go straight back into the pool
+      // unless they explicitly withdrew. The next pairing tick (or eager pair
+      // triggered inside markReady) puts them into a new game in ≤1 second.
+      const { markReady, broadcastStandings, broadcastQueueSummary } = await import('../tournaments/runtime.js');
+      const t = await prisma.tournament.findUnique({
+        where: { id: room.tournamentId },
+        select: { status: true },
+      });
+      if (t?.status === 'ACTIVE') {
+        const tps = await prisma.tournamentPlayer.findMany({
+          where: { tournamentId: room.tournamentId, userId: { in: [room.whitePlayerId, room.blackPlayerId] }, withdrew: false },
+          select: { userId: true },
+        });
+        for (const p of tps) markReady(room.tournamentId, p.userId);
+      }
       await broadcastStandings(room.tournamentId);
       broadcastQueueSummary(room.tournamentId);
     } catch (e) {
       console.error('tournament scoring failed', { matchId: room.id, err: (e as Error).message });
     }
   }
+}
+
+/** Caller (socket.ts) registers a callback so the runtime can broadcast a
+ *  game-over event for no-show forfeits without importing the io instance. */
+type EndBroadcaster = (room: MatchRoom, outcome: 'WHITE_WON' | 'BLACK_WON', reason: 'NO_SHOW') => void;
+let endBroadcaster: EndBroadcaster | null = null;
+export function setMatchEndBroadcaster(fn: EndBroadcaster) {
+  endBroadcaster = fn;
+}
+
+function armFirstMoveTimer(room: MatchRoom) {
+  if (room.firstMoveTimer) clearTimeout(room.firstMoveTimer);
+  room.firstMoveTimer = setTimeout(async () => {
+    if (room.ended) return;
+    const noShowSide = room.game.turn(); // the side that failed to move
+    const outcome = noShowSide === 'w' ? 'BLACK_WON' : 'WHITE_WON';
+    const winnerColor: Color = noShowSide === 'w' ? 'b' : 'w';
+    await finalize(room, { outcome, reason: 'NO_SHOW' }, Date.now(), winnerColor);
+    endBroadcaster?.(room, outcome, 'NO_SHOW');
+  }, FIRST_MOVE_TIMEOUT_MS);
 }
 
 // Test/cleanup helper

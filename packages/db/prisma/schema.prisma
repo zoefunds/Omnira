@@ -190,6 +190,7 @@ enum MatchResultReason {
   INSUFFICIENT_MATERIAL
   AGREEMENT
   ABANDONMENT
+  NO_SHOW
 }
 
 model Match {

@@ -26,7 +26,16 @@ function getInGame(tid: string) {
 
 export function markReady(tournamentId: string, userId: string) {
   getReady(tournamentId).add(userId);
+  // Try to pair immediately — no need to wait for the next 750ms tick when
+  // two players are simultaneously ready.
+  if (ioRef && lastSpawnFn) {
+    void pairOneActiveTournament(tournamentId, ioRef, lastSpawnFn).catch((e) =>
+      console.error('eager pair failed', (e as Error).message),
+    );
+  }
 }
+
+let lastSpawnFn: Parameters<typeof pairOneActiveTournament>[2] | null = null;
 
 export function getReadyCount(tournamentId: string) { return getReady(tournamentId).size; }
 export function getInGameCount(tournamentId: string) { return getInGame(tournamentId).size; }
@@ -108,10 +117,16 @@ async function pairOneActiveTournament(
       markInGameStart(tournamentId, whitePlayerId);
       markInGameStart(tournamentId, blackPlayerId);
 
+      const [wpt, bpt] = await Promise.all([
+        prisma.user.findUnique({ where: { id: whitePlayerId }, select: { username: true } }),
+        prisma.user.findUnique({ where: { id: blackPlayerId }, select: { username: true } }),
+      ]);
       const start = {
         matchId: room.id,
         whitePlayerId,
         blackPlayerId,
+        whiteUsername: wpt?.username ?? null,
+        blackUsername: bpt?.username ?? null,
         initialMs: t.initialMs,
         incrementMs: t.incrementMs,
         fen: room.game.fen(),
@@ -143,6 +158,7 @@ export function startTournamentRuntime(
   spawnMatchFn: Parameters<typeof pairOneActiveTournament>[2],
 ): () => void {
   ioRef = io;
+  lastSpawnFn = spawnMatchFn;
   // Status transitions every 10s.
   statusInterval = setInterval(async () => {
     try {
@@ -206,7 +222,8 @@ export function startTournamentRuntime(
     }
   }, 10_000);
 
-  // Pairing every 2s for each ACTIVE tournament.
+  // Pairing every 750ms for each ACTIVE tournament — fast enough to feel
+  // instant when two players are both ready, light enough at idle.
   pairInterval = setInterval(async () => {
     try {
       const active = await prisma.tournament.findMany({
@@ -219,7 +236,7 @@ export function startTournamentRuntime(
     } catch (e) {
       console.error('tournament pairing tick failed', (e as Error).message);
     }
-  }, 2_000);
+  }, 750);
 
   return () => {
     if (statusInterval) clearInterval(statusInterval);

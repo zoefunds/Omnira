@@ -1,11 +1,12 @@
 'use client';
 
-import { useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { Chess, type Square } from 'chess.js';
 import type { Socket } from 'socket.io-client';
 import { useMatch } from '@/store/match';
 import { useAuth } from '@/store/auth';
+import { useRouter } from 'next/navigation';
 import { Clock } from './Clock';
 import { MatchSidebar } from './MatchSidebar';
 import { Button } from './Button';
@@ -124,14 +125,16 @@ export function MatchView({ socket }: Props) {
   const whiteTicking = !m.ended && m.turn === 'w';
   const blackTicking = !m.ended && m.turn === 'b';
 
+  const opponentLabel = m.opponentUsername ?? 'Opponent';
   const opponentClock =
     m.myColor === 'w'
-      ? <Clock label="Opponent" remainingMs={m.blackMs} tickFrom={m.clockTickFrom} ticking={blackTicking} />
-      : <Clock label="Opponent" remainingMs={m.whiteMs} tickFrom={m.clockTickFrom} ticking={whiteTicking} />;
+      ? <Clock label={opponentLabel} remainingMs={m.blackMs} tickFrom={m.clockTickFrom} ticking={blackTicking} />
+      : <Clock label={opponentLabel} remainingMs={m.whiteMs} tickFrom={m.clockTickFrom} ticking={whiteTicking} />;
+  const myLabel = m.myUsername ?? user?.username ?? 'You';
   const myClock =
     m.myColor === 'w'
-      ? <Clock label="You" remainingMs={m.whiteMs} tickFrom={m.clockTickFrom} ticking={whiteTicking} />
-      : <Clock label="You" remainingMs={m.blackMs} tickFrom={m.clockTickFrom} ticking={blackTicking} />;
+      ? <Clock label={myLabel} remainingMs={m.whiteMs} tickFrom={m.clockTickFrom} ticking={whiteTicking} />
+      : <Clock label={myLabel} remainingMs={m.blackMs} tickFrom={m.clockTickFrom} ticking={blackTicking} />;
 
   return (
     <div className="grid lg:grid-cols-[1fr_auto] gap-4 lg:gap-6 items-start" data-test-mycolor={m.myColor ?? ""}>
@@ -151,32 +154,92 @@ export function MatchView({ socket }: Props) {
         </div>
         <div className="mt-3">{myClock}</div>
 
-        {m.ended && <EndOverlay />}
+        {m.ended && <EndOverlay socket={socket} />}
       </div>
       <MatchSidebar socket={socket} />
     </div>
   );
 }
 
-function EndOverlay() {
+function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
   const ended = useMatch((s) => s.ended);
+  const myColor = useMatch((s) => s.myColor);
+  const opponentUsername = useMatch((s) => s.opponentUsername);
+  const tournamentId = useMatch((s) => s.tournamentId);
+  const queueRejoin = useMatch((s) => s.queueRejoin);
   const reset = useMatch((s) => s.reset);
+  const router = useRouter();
+  const [countdown, setCountdown] = useState(4);
+
+  useEffect(() => {
+    if (!ended) return;
+    if (countdown <= 0) return;
+    const id = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [ended, countdown]);
+
+  // When the countdown hits zero, auto-rejoin queue / tournament.
+  useEffect(() => {
+    if (!ended || countdown > 0) return;
+    if (tournamentId) {
+      socket.emit('tournament:queue:join', { tournamentId }, () => {});
+      reset();
+      router.replace(`/tournaments/${tournamentId}`);
+    } else if (queueRejoin) {
+      socket.emit('queue:join', queueRejoin, () => {});
+      reset();
+      router.replace('/lobby');
+    }
+    // private games: no auto-rejoin, user goes back manually
+  }, [countdown, ended, tournamentId, queueRejoin, socket, reset, router]);
+
   if (!ended) return null;
-  const title =
-    ended.outcome === 'DRAW'
-      ? 'Draw'
-      : ended.outcome === 'WHITE_WON'
-        ? 'White wins'
-        : 'Black wins';
+
+  const iWon =
+    (ended.outcome === 'WHITE_WON' && myColor === 'w') ||
+    (ended.outcome === 'BLACK_WON' && myColor === 'b');
+  const isDraw = ended.outcome === 'DRAW';
+  const title = isDraw ? 'Draw' : iWon ? 'You won' : 'You lost';
+  const subtitle = ended.reason === 'NO_SHOW'
+    ? `${iWon ? opponentUsername ?? 'Opponent' : 'You'} failed to move in time`
+    : ended.reason.replace(/_/g, ' ').toLowerCase();
+
   return (
-    <div className="mt-6 rounded-xl border border-parchment-300 bg-parchment-50 p-5 max-w-md">
-      <div className="font-serif text-2xl text-ink-900">{title}</div>
-      <div className="mt-1 text-sm text-ink-600">
-        {ended.reason.replace(/_/g, ' ').toLowerCase()}
+    <div className="mt-6 rounded-xl border border-parchment-300 bg-parchment-50 p-6 max-w-md shadow-card">
+      <div
+        className={`font-serif text-3xl ${
+          isDraw ? 'text-ink-900' : iWon ? 'text-gold-700' : 'text-danger'
+        }`}
+      >
+        {title}
       </div>
-      <Button className="mt-4" onClick={reset}>
-        New game
-      </Button>
+      <div className="mt-1 text-sm text-ink-600">{subtitle}</div>
+      {(tournamentId || queueRejoin) && countdown > 0 && (
+        <div className="mt-4 inline-flex items-center gap-2 rounded-md border border-gold-300 bg-parchment-100 px-3 py-2 text-xs text-ink-700">
+          <span className="h-2 w-2 rounded-full bg-gold-500 animate-pulse" />
+          {tournamentId ? 'Next opponent' : 'Re-queueing'} in {countdown}s
+        </div>
+      )}
+      <div className="mt-4 flex gap-2">
+        {(tournamentId || queueRejoin) && (
+          <Button
+            variant="ghost"
+            onClick={() => setCountdown(0)}
+          >
+            Skip wait
+          </Button>
+        )}
+        <Button
+          onClick={() => {
+            // Cancel any pending rejoin and just go home.
+            setCountdown(-1);
+            reset();
+            router.replace('/lobby');
+          }}
+        >
+          Back to lobby
+        </Button>
+      </div>
     </div>
   );
 }

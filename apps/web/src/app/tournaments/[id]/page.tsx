@@ -45,9 +45,9 @@ export default function TournamentPage() {
   useEffect(() => {
     if (!socket || !user) return;
     socket.emit('tournament:subscribe', { tournamentId: id }, () => {});
-    const onStart = (p: { matchId: string; whitePlayerId: string; blackPlayerId: string; fen: string; initialMs: number; incrementMs: number; tournamentId?: string }) => {
+    const onStart = (p: { matchId: string; whitePlayerId: string; blackPlayerId: string; whiteUsername?: string | null; blackUsername?: string | null; fen: string; initialMs: number; incrementMs: number; tournamentId?: string }) => {
       if (p.tournamentId !== id) return;
-      matchStore.onMatchStart({ ...p, myUserId: user.id });
+      matchStore.onMatchStart({ ...p, myUserId: user.id, tournamentId: id });
       router.push('/play');
     };
     const onQueueState = (p: { tournamentId: string; userId: string; ready: boolean }) => {
@@ -95,8 +95,18 @@ export default function TournamentPage() {
   async function join() {
     if (!token) return;
     setBusy(true);
-    try { await api.joinTournament(id, token); await refresh(); }
-    finally { setBusy(false); }
+    try {
+      await api.joinTournament(id, token);
+      await refresh();
+      // Auto-enter the pairing pool the moment we join — same flow as lichess.
+      if (socket) {
+        socket.emit('tournament:queue:join', { tournamentId: id }, () => {
+          setInQueue(true);
+        });
+      }
+    } finally {
+      setBusy(false);
+    }
   }
   async function withdraw() {
     if (!token) return;

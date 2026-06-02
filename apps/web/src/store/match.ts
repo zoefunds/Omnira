@@ -15,6 +15,10 @@ export interface MatchState {
   fen: string;
   myColor: Color | null;
   opponentId: string | null;
+  opponentUsername: string | null;
+  myUsername: string | null;
+  tournamentId: string | null;
+  queueRejoin: { initialMs: number; incrementMs: number } | null;
   initialMs: number;
   incrementMs: number;
   whiteMs: number;
@@ -33,10 +37,14 @@ export interface MatchState {
     matchId: string;
     whitePlayerId: string;
     blackPlayerId: string;
+    whiteUsername?: string | null;
+    blackUsername?: string | null;
     myUserId: string;
     fen: string;
     initialMs: number;
     incrementMs: number;
+    tournamentId?: string | null;
+    queueRejoin?: { initialMs: number; incrementMs: number } | null;
   }) => void;
   onMatchMove: (p: {
     ply: number;
@@ -86,6 +94,10 @@ const initial = (): Omit<
   fen: INITIAL_FEN,
   myColor: null,
   opponentId: null,
+  opponentUsername: null,
+  myUsername: null,
+  tournamentId: null,
+  queueRejoin: null,
   initialMs: 0,
   incrementMs: 0,
   whiteMs: 0,
@@ -108,6 +120,12 @@ export const useMatch = create<MatchState>((set) => ({
       fen: p.fen,
       myColor: p.whitePlayerId === p.myUserId ? 'w' : 'b',
       opponentId: p.whitePlayerId === p.myUserId ? p.blackPlayerId : p.whitePlayerId,
+      opponentUsername:
+        p.whitePlayerId === p.myUserId ? p.blackUsername ?? null : p.whiteUsername ?? null,
+      myUsername:
+        p.whitePlayerId === p.myUserId ? p.whiteUsername ?? null : p.blackUsername ?? null,
+      tournamentId: p.tournamentId ?? null,
+      queueRejoin: p.queueRejoin ?? null,
       initialMs: p.initialMs,
       incrementMs: p.incrementMs,
       whiteMs: p.initialMs,

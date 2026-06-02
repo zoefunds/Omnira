@@ -11,7 +11,8 @@ export type ResultReason =
   | 'RESIGNATION'
   | 'TIMEOUT'
   | 'AGREEMENT'
-  | 'ABANDONMENT';
+  | 'ABANDONMENT'
+  | 'NO_SHOW';
 
 export type Outcome = 'WHITE_WON' | 'BLACK_WON' | 'DRAW';
 
