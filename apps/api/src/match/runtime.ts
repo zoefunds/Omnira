@@ -283,20 +283,17 @@ async function finalize(room: MatchRoom, gameOver: GameOverState, now: number, t
       markInGameEnd(room.tournamentId, room.whitePlayerId);
       markInGameEnd(room.tournamentId, room.blackPlayerId);
       // Lichess-arena behavior: both players go straight back into the pool
-      // unless they explicitly withdrew. The next pairing tick (or eager pair
-      // triggered inside markReady) puts them into a new game in ≤1 second.
-      const { markReady, broadcastStandings, broadcastQueueSummary } = await import('../tournaments/runtime.js');
-      const t = await prisma.tournament.findUnique({
-        where: { id: room.tournamentId },
-        select: { status: true },
-      });
-      if (t?.status === 'ACTIVE') {
-        const tps = await prisma.tournamentPlayer.findMany({
-          where: { tournamentId: room.tournamentId, userId: { in: [room.whitePlayerId, room.blackPlayerId] }, withdrew: false },
-          select: { userId: true },
-        });
-        for (const p of tps) markReady(room.tournamentId, p.userId);
-      }
+      // unless they explicitly withdrew. The 5-second post-game cooldown
+      // (applyPostGameCooldown) makes sure they SEE the result first before
+      // the next board appears.
+      const { applyPostGameCooldown, broadcastStandings, broadcastQueueSummary } =
+        await import('../tournaments/runtime.js');
+      // Apply cooldown so the client's auto-rejoin (which fires 5s after the
+      // result is shown) lands cleanly into the pool. We do NOT auto-markReady
+      // here — the client's EndOverlay sends tournament:queue:join after the
+      // countdown, which is the single source of truth.
+      applyPostGameCooldown(room.whitePlayerId);
+      applyPostGameCooldown(room.blackPlayerId);
       await broadcastStandings(room.tournamentId);
       broadcastQueueSummary(room.tournamentId);
     } catch (e) {

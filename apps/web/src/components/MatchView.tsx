@@ -169,7 +169,10 @@ function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
   const queueRejoin = useMatch((s) => s.queueRejoin);
   const reset = useMatch((s) => s.reset);
   const router = useRouter();
-  const [countdown, setCountdown] = useState(4);
+  // Matches the server-side POST_GAME_COOLDOWN_MS (5s). If we re-queue before
+  // the cooldown elapses, the server will silently skip us until the cooldown
+  // is up, but it's cleaner to align the UI countdown.
+  const [countdown, setCountdown] = useState(5);
 
   useEffect(() => {
     if (!ended) return;

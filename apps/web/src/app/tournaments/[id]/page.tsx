@@ -145,10 +145,10 @@ export default function TournamentPage() {
 
       <div className="rounded-xl border border-parchment-300 bg-parchment-100">
         <div className="px-4 py-2 border-b border-parchment-300 flex justify-between">
-          <div className="text-xs uppercase tracking-wider text-ink-400">Standings</div>
+          <div className="text-xs uppercase tracking-wider text-ink-400">Leaderboard</div>
           <div className="text-xs text-ink-400">{standings.length} player{standings.length === 1 ? '' : 's'}</div>
         </div>
-        <ol className="divide-y divide-parchment-300">
+        <ol className="divide-y divide-parchment-300 max-h-[60vh] overflow-y-auto">
           {standings.length === 0 && <li className="p-4 text-sm text-ink-400">No players yet.</li>}
           {standings.map((p, i) => {
             const isMe = p.userId === user.id;

@@ -10,6 +10,31 @@ import { prisma as _prisma } from '@omnira/db';
  * In-memory because Phase 11B is single-server. Redis-backed in Phase 13 if we scale.
  */
 const ready: Map<string /*tournamentId*/, Set<string /*userId*/>> = new Map();
+/** After a tournament game ends, both players sit out the pairing pool for
+ *  this many ms so they can see the result before the next board appears. */
+export const POST_GAME_COOLDOWN_MS = 5_000;
+/** userId → epoch ms when they become eligible for pairing again. */
+const cooldownUntil: Map<string, number> = new Map();
+
+export function applyPostGameCooldown(userId: string) {
+  cooldownUntil.set(userId, Date.now() + POST_GAME_COOLDOWN_MS);
+  // Auto-expire so the map doesn't grow forever
+  setTimeout(() => {
+    const t = cooldownUntil.get(userId);
+    if (t && t <= Date.now()) cooldownUntil.delete(userId);
+  }, POST_GAME_COOLDOWN_MS + 100);
+}
+
+function isCoolingDown(userId: string): boolean {
+  const t = cooldownUntil.get(userId);
+  if (!t) return false;
+  if (t <= Date.now()) {
+    cooldownUntil.delete(userId);
+    return false;
+  }
+  return true;
+}
+
 /** Per-tournament currently-in-game set so we don't re-pair active players. */
 const inGame: Map<string, Set<string>> = new Map();
 
@@ -51,7 +76,7 @@ export function broadcastQueueSummary(tournamentId: string) {
 }
 export async function broadcastStandings(tournamentId: string) {
   if (!ioRef) return;
-  const standings = await listStandings(tournamentId, 100);
+  const standings = await listStandings(tournamentId, 1000);
   ioRef.to(`tournament:${tournamentId}`).emit('tournament:standings', { tournamentId, standings });
 }
 export function markNotReady(tournamentId: string, userId: string) {
@@ -72,6 +97,35 @@ export function isReady(tournamentId: string, userId: string) {
  * Closest-score pairing. Both players must be a participant, ready, and not in a game.
  * We sort by score desc and greedily pair adjacent compatible players.
  */
+/**
+ * For each player in the candidate list, find the userId of their most
+ * recent opponent within this tournament. Used to break the rematch loop
+ * that otherwise pairs two finishers back together immediately.
+ */
+async function getLastOpponentMap(
+  tournamentId: string,
+  userIds: string[],
+): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  // Pull the most recent match per player. One query is fine at this scale.
+  const recent = await prisma.match.findMany({
+    where: {
+      tournamentId,
+      OR: [{ whitePlayerId: { in: userIds } }, { blackPlayerId: { in: userIds } }],
+      status: { in: ['ACTIVE', 'WHITE_WON', 'BLACK_WON', 'DRAW'] },
+    },
+    orderBy: { startedAt: 'desc' },
+    select: { whitePlayerId: true, blackPlayerId: true, startedAt: true },
+    take: userIds.length * 4, // each player can appear in many matches; we just need the freshest
+  });
+  const map = new Map<string, string>();
+  for (const m of recent) {
+    if (!map.has(m.whitePlayerId)) map.set(m.whitePlayerId, m.blackPlayerId);
+    if (!map.has(m.blackPlayerId)) map.set(m.blackPlayerId, m.whitePlayerId);
+  }
+  return map;
+}
+
 async function pairOneActiveTournament(
   tournamentId: string,
   io: Server,
@@ -92,15 +146,54 @@ async function pairOneActiveTournament(
   const standings = await listStandings(tournamentId, 1000);
   const readySet = getReady(tournamentId);
   const inGameSet = getInGame(tournamentId);
-  // Eligible = in standings, ready, not in game, not withdrew
+  // Eligible = in standings, ready, not in game, not withdrew, not cooling
+  // down from a just-finished game.
   const eligible = standings
-    .filter((p) => readySet.has(p.userId) && !inGameSet.has(p.userId) && !p.withdrew)
+    .filter(
+      (p) =>
+        readySet.has(p.userId) &&
+        !inGameSet.has(p.userId) &&
+        !p.withdrew &&
+        !isCoolingDown(p.userId),
+    )
     .map((p) => ({ userId: p.userId, score: p.score }));
 
-  // Sorted by score desc already (via listStandings)
-  for (let i = 0; i + 1 < eligible.length; i += 2) {
+  if (eligible.length < 2) return;
+
+  // Lichess-style anti-rematch: for each candidate pair (i, i+1) in the
+  // score-sorted list, look up the previous opponent of player i. If it's
+  // player i+1 *and* there's another option available, slide i+1 down the
+  // list one slot. Avoids the "same two players paired N times in a row" bug
+  // we hit after auto-rejoin pool started instantly re-queueing finishers.
+  const lastOpponent = await getLastOpponentMap(tournamentId, eligible.map((e) => e.userId));
+
+  const paired = new Set<string>();
+  const pairs: Array<{ a: { userId: string }; b: { userId: string } }> = [];
+  for (let i = 0; i < eligible.length; i++) {
     const a = eligible[i]!;
-    const b = eligible[i + 1]!;
+    if (paired.has(a.userId)) continue;
+    // Find the first remaining player who isn't a's last opponent, falling
+    // back to the next available if no such candidate exists.
+    let bIdx = -1;
+    let fallbackIdx = -1;
+    for (let j = i + 1; j < eligible.length; j++) {
+      const cand = eligible[j]!;
+      if (paired.has(cand.userId)) continue;
+      if (fallbackIdx === -1) fallbackIdx = j;
+      if (lastOpponent.get(a.userId) !== cand.userId) {
+        bIdx = j;
+        break;
+      }
+    }
+    if (bIdx === -1) bIdx = fallbackIdx;
+    if (bIdx === -1) continue;
+    const b = eligible[bIdx]!;
+    paired.add(a.userId);
+    paired.add(b.userId);
+    pairs.push({ a, b });
+  }
+
+  for (const { a, b } of pairs) {
     // Random color
     const whiteFirst = Math.random() < 0.5;
     const whitePlayerId = whiteFirst ? a.userId : b.userId;

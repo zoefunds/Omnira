@@ -35,7 +35,8 @@ export async function registerTournamentRoutes(app: FastifyInstance) {
   app.get('/tournaments/:id/standings', { config: { rateLimit: false } }, async (req, reply) => {
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) return reply.code(400).send({ error: 'BAD_ID' });
-    const standings = await listStandings(id);
+    // Lift the per-request cap so the frontend can render the full leaderboard.
+    const standings = await listStandings(id, 1000);
     return { standings };
   });
 

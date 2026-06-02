@@ -93,8 +93,16 @@ export default function ForgotPasswordPage() {
                     matches an Omnira account, we&apos;ve sent a reset link.
                     It expires in 30 minutes.
                   </p>
+                  <div className="mt-3 rounded-md border border-parchment-300 bg-parchment-100 p-2 text-[11px] text-ink-600 leading-snug">
+                    <strong className="text-ink-900">Can&apos;t find it?</strong>
+                    <ol className="mt-1 ml-4 list-decimal space-y-0.5">
+                      <li>Check your <b>Spam</b> and <b>Promotions</b> folders.</li>
+                      <li>Confirm you signed up with this exact email address.</li>
+                      <li>Verify the sender (mark as Not Spam) so future links arrive.</li>
+                    </ol>
+                  </div>
                   <p className="mt-4 text-xs text-ink-400">
-                    Didn&apos;t receive anything? Check your spam folder, or{' '}
+                    Still nothing? Try{' '}
                     <button
                       onClick={() => setSent(false)}
                       className="text-gold-700 hover:text-gold-600"
