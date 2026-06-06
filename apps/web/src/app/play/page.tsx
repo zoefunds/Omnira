@@ -122,13 +122,20 @@ export default function PlayPage() {
 
   const inMatch = !!m.matchId && !m.ended;
   const hasResult = !!m.matchId && !!m.ended;
+  // Guard rail: only redirect to /lobby when we're truly out of any match
+  // AND there's no pending result OR tournament context that EndOverlay is
+  // about to use. Without this gate, the deferred reset() race could redirect
+  // us to /lobby right after EndOverlay queued a tournament redirect.
+  const hasPendingAutoRejoin = !!m.tournamentId || !!m.queueRejoin;
+  const showRedirectToLobby =
+    !inMatch && !hasResult && rejoinChecked && !hasPendingAutoRejoin;
 
   return (
     <div className="flex">
       <PlaySidebar />
 
       <div className="flex-1 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8 w-full">
-        {!inMatch && !hasResult && rejoinChecked && <RedirectToLobby />}
+        {showRedirectToLobby && <RedirectToLobby />}
         {!inMatch && !hasResult && !rejoinChecked && (
           <div className="rounded-xl border border-parchment-300 bg-parchment-100/60 shadow-card p-12 text-center text-sm text-ink-600">
             Reconnecting to your game…

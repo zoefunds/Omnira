@@ -182,45 +182,33 @@ function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
   }, [ended, countdown]);
 
   // When the countdown hits zero, auto-rejoin queue / tournament.
-  // Wait for the server's ack before navigating so the destination page
-  // sees the user already in queue (avoids a flash of "Join queue" state).
+  // CRITICAL ordering: navigate FIRST, then defer the store reset.
+  // Calling reset() synchronously caused /play to re-render with
+  // matchId=null, which fired <RedirectToLobby />. Its router.replace('/lobby')
+  // then raced against our tournament redirect, and the second redirect won —
+  // so users ended up on /lobby instead of the tournament.
   useEffect(() => {
     if (!ended || countdown > 0) return;
+
     if (tournamentId) {
-      socket.emit(
-        'tournament:queue:join',
-        { tournamentId },
-        (_ack: { ok: boolean; error?: string }) => {
-          reset();
-          router.replace(`/tournaments/${tournamentId}`);
-        },
-      );
-      // Safety net: navigate after 1s even if the ack never lands.
-      const fallback = setTimeout(() => {
-        reset();
-        router.replace(`/tournaments/${tournamentId}`);
-      }, 1000);
-      return () => clearTimeout(fallback);
-    } else if (queueRejoin) {
-      socket.emit(
-        'queue:join',
-        queueRejoin,
-        (_ack: { ok: boolean; status?: string; error?: string }) => {
-          reset();
-          // Set queueStatus AFTER reset so the lobby renders "Searching" right away
-          // (the casual queue doesn't have a tournament:queue:state push to revive it).
-          useMatch.setState({ queueStatus: 'waiting' });
-          router.replace('/lobby');
-        },
-      );
-      const fallback = setTimeout(() => {
-        reset();
-        useMatch.setState({ queueStatus: 'waiting' });
-        router.replace('/lobby');
-      }, 1000);
-      return () => clearTimeout(fallback);
+      // Navigate FIRST so /play starts unmounting before any reset.
+      router.replace(`/tournaments/${tournamentId}`);
+      socket.emit('tournament:queue:join', { tournamentId }, () => {});
+      // Reset 500ms later — by then /play is gone and the tournament page
+      // has mounted. The next match:start will overwrite state cleanly.
+      setTimeout(reset, 500);
+      return;
     }
-    // private games: no auto-rejoin, user goes back manually
+    if (queueRejoin) {
+      // Prime queueStatus so the lobby's "Searching for an opponent" card
+      // shows immediately on mount (we don't reset until after navigation).
+      useMatch.setState({ queueStatus: 'waiting' });
+      router.replace('/lobby');
+      socket.emit('queue:join', queueRejoin, () => {});
+      setTimeout(reset, 500);
+      return;
+    }
+    // Private game: no auto-rejoin, user goes back manually.
   }, [countdown, ended, tournamentId, queueRejoin, socket, reset, router]);
 
   if (!ended) return null;
