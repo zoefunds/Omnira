@@ -18,6 +18,7 @@ import {
   CheckCircle2,
   XCircle,
   SkipForward,
+  Lightbulb,
   ArrowRight,
   Trophy,
   Target,
@@ -41,6 +42,8 @@ export default function PuzzlesPage() {
   const [selected, setSelected] = useState<Square | null>(null);
   const [graded, setGraded] = useState<ApiPuzzleAttemptResponse | null>(null);
   const [startTs, setStartTs] = useState<number>(Date.now());
+  // Hint state: 'none' → 'piece' (highlight the from-square) → 'square' (highlight to-square as well)
+  const [hintLevel, setHintLevel] = useState<'none' | 'piece' | 'square'>('none');
 
   useEffect(() => {
     if (!hydrated) return;
@@ -52,6 +55,7 @@ export default function PuzzlesPage() {
     setPhase('loading');
     setGraded(null);
     setSelected(null);
+    setHintLevel('none');
     try {
       const r = await api.getNextPuzzle(token);
       if (r && 'puzzle' in r && r.puzzle) {
@@ -229,6 +233,23 @@ export default function PuzzlesPage() {
           };
     }
   }
+  // Hint overlay — gold ring on the from-square (level 'piece') and additionally
+  // on the to-square (level 'square'). We don't disrupt the existing selection
+  // styles; if there's overlap the hint just stacks on top.
+  if (hintLevel !== 'none' && puzzle.solutionUci.length >= 4) {
+    const fromSq = puzzle.solutionUci.slice(0, 2);
+    squareStyles[fromSq] = {
+      ...(squareStyles[fromSq] ?? {}),
+      boxShadow: 'inset 0 0 0 4px rgba(184,144,31,0.85)',
+    };
+    if (hintLevel === 'square') {
+      const toSq = puzzle.solutionUci.slice(2, 4);
+      squareStyles[toSq] = {
+        ...(squareStyles[toSq] ?? {}),
+        boxShadow: 'inset 0 0 0 4px rgba(184,144,31,0.85)',
+      };
+    }
+  }
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
@@ -257,13 +278,38 @@ export default function PuzzlesPage() {
               to move. Find the best move.
             </div>
             {phase === 'solving' && (
-              <button
-                onClick={skip}
-                className="inline-flex items-center gap-2 rounded-md border border-parchment-400 px-4 py-2 text-sm text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
-              >
-                <SkipForward size={14} strokeWidth={1.5} />
-                Skip
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() =>
+                    setHintLevel((h) =>
+                      h === 'none' ? 'piece' : h === 'piece' ? 'square' : 'square',
+                    )
+                  }
+                  disabled={hintLevel === 'square'}
+                  title={
+                    hintLevel === 'none'
+                      ? 'Highlight the piece to move'
+                      : hintLevel === 'piece'
+                      ? 'Highlight the target square'
+                      : 'No more hints — submit your move'
+                  }
+                  className="inline-flex items-center gap-2 rounded-md border border-gold-300 bg-parchment-50 px-3 py-2 text-sm text-gold-700 hover:bg-gold-100 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Lightbulb size={14} strokeWidth={1.5} />
+                  {hintLevel === 'none'
+                    ? 'Hint'
+                    : hintLevel === 'piece'
+                    ? 'Show target'
+                    : 'Hint used'}
+                </button>
+                <button
+                  onClick={skip}
+                  className="inline-flex items-center gap-2 rounded-md border border-parchment-400 px-4 py-2 text-sm text-ink-600 hover:border-ink-900 hover:text-ink-900 transition"
+                >
+                  <SkipForward size={14} strokeWidth={1.5} />
+                  Skip
+                </button>
+              </div>
             )}
           </div>
         </div>

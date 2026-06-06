@@ -5,7 +5,7 @@ import { spawnMatch, getRoom, playMove, resign, offerDraw, acceptDraw, setMatchE
 import { prisma } from '@omnira/db';
 import { acceptChallenge, resolveColors, linkMatch, ChallengeError } from '../lobby/service.js';
 import { postMessage, ChatError } from '../chat/service.js';
-import { markReady, markNotReady, broadcastQueueSummary } from '../tournaments/runtime.js';
+import { markReady, markNotReady, broadcastQueueSummary, isReady, getReadyCount, getInGameCount } from '../tournaments/runtime.js';
 
 interface AuthedSocket extends Socket {
   data: { userId: string };
@@ -215,6 +215,19 @@ export function attachRealtime(app: FastifyInstance): Server {
 
     s.on('tournament:subscribe', async (payload: { tournamentId: string }, ack) => {
       s.join(`tournament:${payload.tournamentId}`);
+      // Snapshot current state so the client doesn't show "Join queue" while
+      // the server already has them in the pool (common after match end →
+      // auto-rejoin → navigate back to the tournament page).
+      s.emit('tournament:queue:state', {
+        tournamentId: payload.tournamentId,
+        userId,
+        ready: isReady(payload.tournamentId, userId),
+      });
+      s.emit('tournament:queue:summary', {
+        tournamentId: payload.tournamentId,
+        readyCount: getReadyCount(payload.tournamentId),
+        inGameCount: getInGameCount(payload.tournamentId),
+      });
       ack?.({ ok: true });
     });
     s.on('tournament:unsubscribe', async (payload: { tournamentId: string }, ack) => {

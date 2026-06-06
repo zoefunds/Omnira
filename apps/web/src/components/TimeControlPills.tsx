@@ -39,18 +39,27 @@ export function TimeControlPills({ socket }: { socket: Socket }) {
       () => { setQueueStatus('idle'); setChosen(null); });
   }
 
-  if (queueStatus === 'waiting' && chosen) {
+  if (queueStatus === 'waiting') {
+    // After auto-rejoin from EndOverlay, `chosen` may be null because the
+    // component just mounted. Show a generic waiting card so the user isn't
+    // confused by seeing the pills again.
     return (
-      <div className="rounded-xl border border-parchment-300 bg-parchment-100 p-5">
-        <div className="text-sm text-ink-400">Searching for an opponent</div>
-        <div className="mt-1 font-serif text-xl text-ink-900">
-          {chosen.category} · {chosen.label}
+      <div className="rounded-xl border border-gold-300 bg-parchment-50 shadow-card p-6 text-center">
+        <div className="mx-auto h-14 w-14 rounded-full bg-gold-shine flex items-center justify-center shadow-soft">
+          <div className="h-6 w-6 border-2 border-parchment-50 border-t-transparent rounded-full animate-spin" />
         </div>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-2 w-2 rounded-full bg-accent animate-pulse" />
-          <span className="text-sm text-ink-600">Matching by rating…</span>
+        <div className="mt-4 text-xs uppercase tracking-[0.25em] text-gold-700">
+          Searching for an opponent
         </div>
-        <Button variant="ghost" className="mt-4" onClick={cancel}>Cancel</Button>
+        <div className="mt-1 font-serif text-2xl text-ink-900">
+          {chosen ? `${chosen.category} · ${chosen.label}` : 'Quick pairing'}
+        </div>
+        <p className="mt-2 text-xs text-ink-600">
+          The matchmaker rotates its window every second to find someone close to your rating.
+        </p>
+        <Button variant="ghost" className="mt-5" onClick={cancel}>
+          Cancel
+        </Button>
         {err && <p className="mt-3 text-sm text-danger">{err}</p>}
       </div>
     );

@@ -182,16 +182,43 @@ function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
   }, [ended, countdown]);
 
   // When the countdown hits zero, auto-rejoin queue / tournament.
+  // Wait for the server's ack before navigating so the destination page
+  // sees the user already in queue (avoids a flash of "Join queue" state).
   useEffect(() => {
     if (!ended || countdown > 0) return;
     if (tournamentId) {
-      socket.emit('tournament:queue:join', { tournamentId }, () => {});
-      reset();
-      router.replace(`/tournaments/${tournamentId}`);
+      socket.emit(
+        'tournament:queue:join',
+        { tournamentId },
+        (_ack: { ok: boolean; error?: string }) => {
+          reset();
+          router.replace(`/tournaments/${tournamentId}`);
+        },
+      );
+      // Safety net: navigate after 1s even if the ack never lands.
+      const fallback = setTimeout(() => {
+        reset();
+        router.replace(`/tournaments/${tournamentId}`);
+      }, 1000);
+      return () => clearTimeout(fallback);
     } else if (queueRejoin) {
-      socket.emit('queue:join', queueRejoin, () => {});
-      reset();
-      router.replace('/lobby');
+      socket.emit(
+        'queue:join',
+        queueRejoin,
+        (_ack: { ok: boolean; status?: string; error?: string }) => {
+          reset();
+          // Set queueStatus AFTER reset so the lobby renders "Searching" right away
+          // (the casual queue doesn't have a tournament:queue:state push to revive it).
+          useMatch.setState({ queueStatus: 'waiting' });
+          router.replace('/lobby');
+        },
+      );
+      const fallback = setTimeout(() => {
+        reset();
+        useMatch.setState({ queueStatus: 'waiting' });
+        router.replace('/lobby');
+      }, 1000);
+      return () => clearTimeout(fallback);
     }
     // private games: no auto-rejoin, user goes back manually
   }, [countdown, ended, tournamentId, queueRejoin, socket, reset, router]);

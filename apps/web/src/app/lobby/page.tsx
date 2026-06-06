@@ -57,12 +57,19 @@ export default function LobbyPage() {
       matchId: string;
       whitePlayerId: string;
       blackPlayerId: string;
+      whiteUsername?: string | null;
+      blackUsername?: string | null;
       fen: string;
       initialMs: number;
       incrementMs: number;
+      tournamentId?: string | null;
+      queueRejoin?: { initialMs: number; incrementMs: number } | null;
     }) => {
       m.onMatchStart({ ...p, myUserId: user.id });
-      router.push('/play');
+      // Microtask delay so the Zustand set commits before navigation reads it
+      // — closes a rare race where /play would mount with m.matchId still null
+      // and fall through to the RedirectToLobby branch.
+      queueMicrotask(() => router.push('/play'));
     };
     socket.on('match:start', onStart);
     return () => {
