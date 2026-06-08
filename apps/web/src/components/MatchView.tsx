@@ -162,6 +162,7 @@ export function MatchView({ socket }: Props) {
 }
 
 function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
+  const matchId = useMatch((s) => s.matchId);
   const ended = useMatch((s) => s.ended);
   const myColor = useMatch((s) => s.myColor);
   const opponentUsername = useMatch((s) => s.opponentUsername);
@@ -182,21 +183,31 @@ function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
   }, [ended, countdown]);
 
   // When the countdown hits zero, auto-rejoin queue / tournament.
-  // CRITICAL ordering: navigate FIRST, then defer the store reset.
-  // Calling reset() synchronously caused /play to re-render with
-  // matchId=null, which fired <RedirectToLobby />. Its router.replace('/lobby')
-  // then raced against our tournament redirect, and the second redirect won —
-  // so users ended up on /lobby instead of the tournament.
+  // Navigate first, then clear only the finished match we came from. Tournament
+  // rejoin can pair immediately, so a blind delayed reset can erase the fresh
+  // match:start state and make /play fall back to /lobby.
   useEffect(() => {
     if (!ended || countdown > 0) return;
+    const finishedMatchId = matchId;
+
+    const clearFinishedMatchAfterNavigation = (expectedPath: string) => {
+      setTimeout(() => {
+        const current = useMatch.getState();
+        if (
+          current.matchId === finishedMatchId &&
+          current.ended &&
+          window.location.pathname === expectedPath
+        ) {
+          reset();
+        }
+      }, 500);
+    };
 
     if (tournamentId) {
-      // Navigate FIRST so /play starts unmounting before any reset.
-      router.replace(`/tournaments/${tournamentId}`);
+      const tournamentPath = `/tournaments/${tournamentId}`;
+      router.replace(tournamentPath);
       socket.emit('tournament:queue:join', { tournamentId }, () => {});
-      // Reset 500ms later — by then /play is gone and the tournament page
-      // has mounted. The next match:start will overwrite state cleanly.
-      setTimeout(reset, 500);
+      clearFinishedMatchAfterNavigation(tournamentPath);
       return;
     }
     if (queueRejoin) {
@@ -205,11 +216,11 @@ function EndOverlay({ socket }: { socket: import('socket.io-client').Socket }) {
       useMatch.setState({ queueStatus: 'waiting' });
       router.replace('/lobby');
       socket.emit('queue:join', queueRejoin, () => {});
-      setTimeout(reset, 500);
+      clearFinishedMatchAfterNavigation('/lobby');
       return;
     }
     // Private game: no auto-rejoin, user goes back manually.
-  }, [countdown, ended, tournamentId, queueRejoin, socket, reset, router]);
+  }, [countdown, ended, matchId, tournamentId, queueRejoin, socket, reset, router]);
 
   if (!ended) return null;
 
